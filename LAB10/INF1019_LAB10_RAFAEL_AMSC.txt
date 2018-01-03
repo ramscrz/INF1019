@@ -1,0 +1,1348 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1)  Execute o programa Corrida de Sapo algumas vezes e
+analise os resultados sobre a ordem de chegada dos
+sapos. Obs: compile com a opção –lpthread
+
+-----------------------------------------------------
+
+ex01.c
+
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define NUM_THREADS      5
+#define PULO_MAXIMO      100
+#define DESCANSO_MAXIMO  1
+#define DISTANCIA_PARA_CORRER 100
+
+static int classificacao = 1;
+static pthread_mutex_t lock;
+static char * resp[200];
+static int cont = 0;
+void *Correr(void *sapo);
+
+int main() {
+
+	classificacao =1;
+	pthread_t threads[NUM_THREADS];
+
+	int t;
+	printf("Corrida iniciada ... \n");
+
+	for(t=0;t < NUM_THREADS;t++)  pthread_create(&threads[t], NULL, Correr, (void *) t);
+	
+	for(t=0;t < NUM_THREADS; t++)  pthread_join(threads[t],NULL);
+
+	printf("\n Acabou!!\n");
+
+	pthread_exit(NULL);
+} 
+
+void *Correr(void  *sapo){
+	int pulos = 0;
+	int distanciaJaCorrida = 0;
+
+	while (distanciaJaCorrida <= DISTANCIA_PARA_CORRER) {
+
+		int pulo = rand() % PULO_MAXIMO;
+		distanciaJaCorrida += pulo;
+		pulos++;
+		printf("Sapo %d pulou (tamanho do pulo = %d)\n", (int) sapo, pulo);
+
+		int descanso = rand() % DESCANSO_MAXIMO;
+		sleep(descanso);
+	}
+
+	printf("Sapo %d  chegou na posicaoo %d com %d pulos\n", (int) sapo, classificacao, pulos);
+	cont++;
+	classificacao++;
+	
+	pthread_exit(NULL);
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o ex01 ex01.c -lpthread
+$ ./ex01
+
+-----------------------------------------------------
+
+RESULTADO
+
+Corrida iniciada ... 
+Sapo 0 pulou (tamanho do pulo = 83)
+Sapo 1 pulou (tamanho do pulo = 77)
+Sapo 2 pulou (tamanho do pulo = 93)
+Sapo 3 pulou (tamanho do pulo = 86)
+Sapo 4 pulou (tamanho do pulo = 49)
+Sapo 3 pulou (tamanho do pulo = 62)
+Sapo 0 pulou (tamanho do pulo = 27)
+Sapo 4 pulou (tamanho do pulo = 90)
+Sapo 1 pulou (tamanho do pulo = 63)
+Sapo 2 pulou (tamanho do pulo = 40)
+Sapo 3  chegou na posicaoo 1 com 2 pulos
+Sapo 4  chegou na posicaoo 1 com 2 pulos
+Sapo 0  chegou na posicaoo 2 com 2 pulos
+Sapo 1  chegou na posicaoo 4 com 2 pulos
+Sapo 2  chegou na posicaoo 5 com 2 pulos
+
+ Acabou!!
+
+Corrida iniciada ... 
+Sapo 1 pulou (tamanho do pulo = 86)
+Sapo 0 pulou (tamanho do pulo = 83)
+Sapo 2 pulou (tamanho do pulo = 93)
+Sapo 3 pulou (tamanho do pulo = 86)
+Sapo 4 pulou (tamanho do pulo = 49)
+Sapo 2 pulou (tamanho do pulo = 62)
+Sapo 0 pulou (tamanho do pulo = 59)
+Sapo 4 pulou (tamanho do pulo = 40)
+Sapo 1 pulou (tamanho do pulo = 27)
+Sapo 3 pulou (tamanho do pulo = 90)
+Sapo 2  chegou na posicaoo 1 com 2 pulos
+Sapo 0  chegou na posicaoo 2 com 2 pulos
+Sapo 4 pulou (tamanho do pulo = 11)
+Sapo 1  chegou na posicaoo 3 com 2 pulos
+Sapo 3  chegou na posicaoo 3 com 2 pulos
+Sapo 4 pulou (tamanho do pulo = 67)
+Sapo 4  chegou na posicaoo 5 com 4 pulos
+
+ Acabou!!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função Correr que é utilizada como a função de threads criadas para a corrida dos sapos. A função Correr gera e soma um valor aleatório de pulo entre 0 e PULO_MAXIMO - 1 (rand() % PULO_MAXIMO) à variável distanciaJaCorrida, repetindo esse procedimento até que a distanciaJaCorrida se torne maior a DISTANCIA_PARA_CORRER. Para cada valor de pulo gerado e somado, uma string é impressa (printf) indicando o tamanho do pulo do sapo. Entre cada pulo, o sapo faz uma pausa de 0 a DESCANSO_MAXIMO-1 segundos(rand() % DESCANSO_MAXIMO), utilizando sleep(descanso) onde descanso é o número de segundos gerados para descanso entre pulos. Quando a distanciaJaCorrida se torna maior que a DISTANCIA_PARA_CORRER, então a função Correr termina de executar o loop, imprime a mensagem indicando a posição em que o sapo chegou. A posição de chegada do sapo é uma variável global static que é incrementada sempre que um sapo termina de percorrer a DISTANCIA_PARA_CORRER. Todos os sapos começam com distanciaJaCorrida igual a 0. 
+
+Logo, a função correr simula a corrida de um só sapo e utiliza uma variável global classificacao para armazenar o número de sapos que já terminaram a corrida. Entretanto, o acesso a essa variável classificacao não é controlado e consequentemente, dado que há mais de uma thread executando a função Correr, antes qye a variável classificacao seja incrementada, um outro sapo (thread) pode imprimir a mensagem indicando a classificacao da thread, assim, duas threads imprimem ter chegado na mesma posição. Isso ocorre exatamente porque após a chegada de um sapo, outro sapo termina a corrida e imprime a sua posição de chegada (classificacao) antes que o primeiro sapo a terminar a corrida incremente a variável classificacao. Nos resultados obtidos, pode ser observado que no primeiro resultado, os sapos (threads) 3 e 4 chegam na mesma posição 1; no segundo resultado, os sapos 1 e 3 chegam na mesma posição 3. 
+
+Cada sapo é uma thread. Na função main(), há dois for statements, o primeiro que chama a função pthread_create NUM_THREADS vezes, criando NUM_THREADS threads, todos elas executam a função Correr passada como parâmetro para a função pthread_create em cada iteração do for. No segundo for, a função pthread_join que recebe uma das thread, criadas no for anterior e armazenadas em threads[t], e faz a função main esperar que a thread passada para a função termine de ser executada. Assim, a função main fica parada aguardando que todas as threads criadas terminem de ser executadas, isto é, aguardando que todos os sapos terminem a corrida.
+
+O erro observado nos resultados pode ser resolvido utilizando um mutex para as threads, garantindo que apenas uma thread acessa a variável classificacao em um mesmo momento, tanto para imprimir a mensagem de chegada do sapo quanto para incrementar classificacao. Isso garante um acesso com exclusão mútua, ou seja, a variável classificacao não é lida ou escrita por mais de uma thread ao mesmo tempo.
+  
+-----------------------------------------------------
+
+QUESTÃO 2) Usando mutex, modifique o programa Corrida de Sampo
+para que o problema identificado anteriormente não
+ocorra. 
+
+-----------------------------------------------------
+
+ex02.c
+
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define NUM_THREADS      5
+#define PULO_MAXIMO      100
+#define DESCANSO_MAXIMO  1
+#define DISTANCIA_PARA_CORRER 100
+
+static int classificacao = 1;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static char * resp[200];
+
+void *Correr(void *sapo);
+
+int main() {
+
+	classificacao = 1;
+	pthread_t threads[NUM_THREADS];
+
+	int t;
+	printf("Corrida iniciada ... \n");
+
+	for(t=0;t < NUM_THREADS;t++)  pthread_create(&threads[t], NULL, Correr, (void *) t);
+	
+	for(t=0;t < NUM_THREADS; t++)  pthread_join(threads[t],NULL);
+
+	printf("\n Acabou!!\n");
+
+	pthread_exit(NULL);
+} 
+
+void *Correr(void  *sapo){
+	int pulos = 0;
+	int distanciaJaCorrida = 0;
+
+	while (distanciaJaCorrida <= DISTANCIA_PARA_CORRER) {
+
+		int pulo = rand() % PULO_MAXIMO;
+		distanciaJaCorrida += pulo;
+		pulos++;
+		printf("Sapo %d pulou (tamanho do pulo = %d)\n", (int) sapo, pulo);
+
+		int descanso = rand() % DESCANSO_MAXIMO;
+		sleep(descanso);
+	}
+
+	pthread_mutex_lock(&lock);
+	printf("Sapo %d  chegou na posicaoo %d com %d pulos\n", (int) sapo, classificacao, pulos);
+
+	classificacao++;
+	pthread_mutex_unlock(&lock);
+	
+	pthread_exit(NULL);
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o ex02 ex02.c -lpthread
+$ ./ex02
+
+-----------------------------------------------------
+
+RESULTADO
+
+Corrida iniciada ... 
+Sapo 1 pulou (tamanho do pulo = 86)
+Sapo 2 pulou (tamanho do pulo = 77)
+Sapo 0 pulou (tamanho do pulo = 83)
+Sapo 3 pulou (tamanho do pulo = 15)
+Sapo 4 pulou (tamanho do pulo = 49)
+Sapo 3 pulou (tamanho do pulo = 62)
+Sapo 0 pulou (tamanho do pulo = 90)
+Sapo 4 pulou (tamanho do pulo = 59)
+Sapo 2 pulou (tamanho do pulo = 27)
+Sapo 1 pulou (tamanho do pulo = 40)
+Sapo 3 pulou (tamanho do pulo = 11)
+Sapo 0  chegou na posicaoo 1 com 2 pulos
+Sapo 1  chegou na posicaoo 2 com 2 pulos
+Sapo 4  chegou na posicaoo 3 com 2 pulos
+Sapo 2  chegou na posicaoo 4 com 2 pulos
+Sapo 3 pulou (tamanho do pulo = 67)
+Sapo 3  chegou na posicaoo 5 com 4 pulos
+
+ Acabou!!
+
+
+Corrida iniciada ... 
+Sapo 1 pulou (tamanho do pulo = 86)
+Sapo 0 pulou (tamanho do pulo = 83)
+Sapo 2 pulou (tamanho do pulo = 93)
+Sapo 3 pulou (tamanho do pulo = 86)
+Sapo 4 pulou (tamanho do pulo = 49)
+Sapo 0 pulou (tamanho do pulo = 62)
+Sapo 1 pulou (tamanho do pulo = 27)
+Sapo 2 pulou (tamanho do pulo = 63)
+Sapo 3 pulou (tamanho do pulo = 40)
+Sapo 4 pulou (tamanho do pulo = 26)
+Sapo 0  chegou na posicaoo 1 com 2 pulos
+Sapo 4 pulou (tamanho do pulo = 11)
+Sapo 1  chegou na posicaoo 2 com 2 pulos
+Sapo 2  chegou na posicaoo 3 com 2 pulos
+Sapo 4 pulou (tamanho do pulo = 67)
+Sapo 3  chegou na posicaoo 4 com 2 pulos
+Sapo 4  chegou na posicaoo 5 com 4 pulos
+
+ Acabou!!
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O erro observado nos resultados pode ser resolvido utilizando um mutex para as threads, garantindo que apenas uma thread acessa a variável classificacao em um mesmo momento, tanto para imprimir a mensagem de chegada do sapo quanto para incrementar classificacao. Isso garante um acesso com exclusão mútua, ou seja, a variável classificacao não é lida ou escrita por mais de uma thread ao mesmo tempo.
+
+O código desenvolvido é quase exatamente igual ao código desenvolvido no exercício 1. Entretanto, um mutex lock foi utilizado para controlar o acesso das threads à variável classificacao ao término da corrida de cada thread. A thread lock é inicializada na sua declaração como variável static pthread_mutex_t através da atribuição da macro PTHREAD_MUTEX_INITIALIZER. Na função Correr, a chamada da função pthread_mutex_lock(&lock) bloqueia o acesso de qualquer outra thread (sapo) ao código que se segue até que ocorra a chamada pthread_mutex_unlock(&lock) que desbloqueia o mutex. Então, todo o código entre pthread_mutex_lock(&lock) e pthread_mutex_unlock(&lock) está protegido de acesso simultâneo por mais de uma thread (sapo), exclusão mútua garantida e consequentemente nenhuma outra thread pode imprimir a mensagem de chegada (indicando a posição de chegada) antes que a thread que terminou a corrida primeiro termine de imprimir a mensagem de chegada e incrementar a variável classificacao. Ao término da thread, a função pthread_exit(NULL) é chamada indicando o valor de retorno da thread, nesse caso NULL sem valor.
+
+O resultado revela ser o esperado, cada sapo (thread) chega em uma posição diferente.
+
+
+-----------------------------------------------------
+
+QUESTÃO 3)  Usando threads, escreva um programa C que implemente o
+problema do produtor/consumidor. O produtor deve produzir
+dados (números inteiros pseudo-aleatórios) a cada 1 segundo
+colocando-os em uma fila (buffer, implementação circular). O
+consumidor deve retirar dados da fila a cada 2 segundos. O
+tamanho máximo da fila deve ser de 8 elementos (MAXFILA) e
+tanto o produtor como o consumidor devem produzir/consumir
+64 elementos (números inteiros de 1 a 64, por exemplo)
+evitando condições de corrida. Variáveis compartilhadas entre
+threads são simplesmente variáveis globais.
+
+-----------------------------------------------------
+
+ex03.c
+
+#include<stdio.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<assert.h>
+
+#define PRODUCER_MAX 64
+#define CONSUMER_MAX 64
+#define PRODUCER_THREAD_INDEX 0
+#define CONSUMER_THREAD_INDEX 1
+
+// Struct representing a FIFO.
+struct storage {
+
+	unsigned int *buffer;	// Buffer storing FIFO's elements
+	unsigned int max;			// Maximum number of stored elements
+	unsigned int nelem;		// Current number of stored elements
+	unsigned int head;		// Head of the FIFO.
+
+};
+
+typedef struct storage Storage;
+
+static Storage data;
+static unsigned int produced[PRODUCER_MAX];
+static unsigned int consumed[CONSUMER_MAX];
+static pthread_mutex_t accesslock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t can_produce = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t can_consume = PTHREAD_COND_INITIALIZER;
+
+// Function for the Consumer's activities execution.
+void * consumer() {
+
+	int demand = CONSUMER_MAX - 1;
+	int index = 0;
+
+	printf("\nCONSUMER STARTED!\n");
+
+	while(demand >= 0) {
+		
+		sleep(2);
+
+		pthread_mutex_lock(&accesslock);
+
+		if(data.nelem == 0) {
+			//printf("\n WAIT CONSUMER\n");
+			pthread_mutex_lock(&lock);
+			pthread_mutex_unlock(&accesslock);
+			pthread_cond_wait(&can_consume, &lock);
+			pthread_mutex_unlock(&lock);
+			pthread_mutex_lock(&accesslock);
+		}
+
+		index = data.head - data.nelem;
+
+		if(index >= 0) {
+			consumed[demand] = data.buffer[index];
+		} else {
+			consumed[demand] = data.buffer[data.max + index];
+			index = data.max + index;
+		}
+
+		data.nelem--;
+
+		printf("\n\tConsumer reading: %d", consumed[demand]);
+
+		if(data.nelem == data.max - 1) {
+			//printf("\n LIBERA PRODUCER\n");
+			pthread_cond_signal(&can_produce);
+		}
+
+		demand--;
+
+		pthread_mutex_unlock(&accesslock);
+
+	}
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+	pthread_exit(NULL);
+
+}
+
+// Function for the Producer's activities execution.
+void * producer() {
+
+	int demand = PRODUCER_MAX - 1;
+	int index = 0;
+
+	printf("\nPRODUCER STARTED!\n");
+
+	while(demand >= 0) {	
+
+		sleep(1);
+
+		pthread_mutex_lock(&accesslock);
+
+		if(data.nelem == data.max) {
+			//printf("\n WAIT PRODUCER\n");
+			pthread_mutex_lock(&lock);
+			pthread_mutex_unlock(&accesslock);
+			pthread_cond_wait(&can_produce, &lock);
+			pthread_mutex_unlock(&lock);
+			pthread_mutex_lock(&accesslock);
+		}
+
+		produced[demand] = rand() % 65;	
+
+		data.buffer[data.head] = produced[demand];
+		
+		if(data.head == data.max - 1) {
+			data.head = 0;
+		} else {
+			data.head++;
+		}
+
+		data.nelem++;
+
+		printf("\nProducer writing: %d", produced[demand]);
+
+		if(data.nelem == 1 ) {//&& demand < PRODUCER_MAX - 1) {
+			//printf("\nLIBERA CONSUMER\n");
+			pthread_cond_signal(&can_consume);
+		}
+
+		demand--;
+
+		pthread_mutex_unlock(&accesslock);
+	}
+
+	printf("\n\nPRODUCER FINISHED!\n\n");
+
+	pthread_exit(NULL);
+
+}
+
+
+int main() {
+
+	pid_t parent = getpid();
+	unsigned int i = 0;
+	pthread_t threads[2];
+
+	if(CONSUMER_MAX > PRODUCER_MAX){
+		printf("\n\nERROR: MORE CONSUMPTION THAN PRODUCTION!\n\n");
+	}
+	
+	for(i = 0; i < PRODUCER_MAX; i++) {
+		produced[i] = 0;
+	}
+
+	for(i = 0; i < CONSUMER_MAX; i++) {
+		consumed[i] = 0;
+	}
+
+	data.max 	= 8;
+	data.buffer = (int*) malloc (data.max * sizeof(int));	
+	data.nelem = 0;
+	data.head 	= 0;
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	pthread_create(&threads[PRODUCER_THREAD_INDEX], NULL, producer, NULL);
+	pthread_create(&threads[CONSUMER_THREAD_INDEX], NULL, consumer, NULL);
+
+	pthread_join(threads[CONSUMER_THREAD_INDEX],NULL);
+	pthread_join(threads[PRODUCER_THREAD_INDEX],NULL);
+
+	printf("\n\nProduction Order:\n");
+	for(i = 0; i < PRODUCER_MAX; i++) {
+		printf("\t%d\n", produced[i]);
+	}
+
+	printf("\n\nConsumption Order:\n");
+	for(i = 0; i < CONSUMER_MAX; i++) {
+		printf("\t%d\n", consumed[i]);
+		assert(consumed[i] == produced[i]);
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o ex03 ex03.c -lpthread
+$ ./ex03
+
+-----------------------------------------------------
+
+RESULTADO
+
+===== Producer-Consumer Algorithm =====
+
+
+PRODUCER STARTED!
+
+CONSUMER STARTED!
+
+Producer writing: 13
+	Consumer reading: 13
+Producer writing: 61
+Producer writing: 37
+	Consumer reading: 61
+Producer writing: 30
+Producer writing: 53
+	Consumer reading: 37
+Producer writing: 40
+Producer writing: 51
+	Consumer reading: 30
+Producer writing: 42
+Producer writing: 14
+	Consumer reading: 53
+Producer writing: 46
+Producer writing: 2
+	Consumer reading: 40
+Producer writing: 42
+Producer writing: 0
+	Consumer reading: 51
+Producer writing: 4
+Producer writing: 38
+	Consumer reading: 42
+Producer writing: 1
+	Consumer reading: 14
+Producer writing: 35
+	Consumer reading: 46
+Producer writing: 36
+	Consumer reading: 2
+Producer writing: 62
+	Consumer reading: 42
+Producer writing: 11
+	Consumer reading: 0
+Producer writing: 46
+	Consumer reading: 4
+Producer writing: 8
+	Consumer reading: 38
+Producer writing: 42
+	Consumer reading: 1
+Producer writing: 29
+	Consumer reading: 35
+Producer writing: 42
+	Consumer reading: 36
+Producer writing: 5
+	Consumer reading: 62
+Producer writing: 2
+	Consumer reading: 11
+Producer writing: 3
+	Consumer reading: 46
+Producer writing: 62
+	Consumer reading: 8
+Producer writing: 30
+	Consumer reading: 42
+Producer writing: 9
+	Consumer reading: 29
+Producer writing: 12
+	Consumer reading: 42
+Producer writing: 27
+	Consumer reading: 5
+Producer writing: 48
+	Consumer reading: 2
+Producer writing: 44
+	Consumer reading: 3
+Producer writing: 17
+	Consumer reading: 62
+Producer writing: 23
+	Consumer reading: 30
+Producer writing: 31
+	Consumer reading: 9
+Producer writing: 61
+	Consumer reading: 12
+Producer writing: 37
+	Consumer reading: 27
+Producer writing: 14
+	Consumer reading: 48
+Producer writing: 63
+	Consumer reading: 44
+Producer writing: 16
+	Consumer reading: 17
+Producer writing: 14
+	Consumer reading: 23
+Producer writing: 4
+	Consumer reading: 31
+Producer writing: 57
+	Consumer reading: 61
+Producer writing: 18
+	Consumer reading: 37
+Producer writing: 39
+	Consumer reading: 14
+Producer writing: 30
+	Consumer reading: 63
+Producer writing: 15
+	Consumer reading: 16
+Producer writing: 53
+	Consumer reading: 14
+Producer writing: 11
+	Consumer reading: 4
+Producer writing: 26
+	Consumer reading: 57
+Producer writing: 30
+	Consumer reading: 18
+Producer writing: 41
+	Consumer reading: 39
+Producer writing: 3
+	Consumer reading: 30
+Producer writing: 37
+	Consumer reading: 15
+Producer writing: 45
+	Consumer reading: 53
+Producer writing: 6
+	Consumer reading: 11
+Producer writing: 36
+	Consumer reading: 26
+Producer writing: 10
+	Consumer reading: 30
+Producer writing: 15
+	Consumer reading: 41
+Producer writing: 49
+	Consumer reading: 3
+Producer writing: 37
+
+PRODUCER FINISHED!
+
+
+	Consumer reading: 37
+	Consumer reading: 45
+	Consumer reading: 6
+	Consumer reading: 36
+	Consumer reading: 10
+	Consumer reading: 15
+	Consumer reading: 49
+	Consumer reading: 37
+
+CONSUMER ENDED!
+
+
+
+Production Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+Consumption Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+ ===== END OF EXECUTION! ===== 
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido é quase exatamente igual ao código desenvolvido no laboratório 4, onde era pedido implementar exatamente um modelo produtor-consumidor com fila circular. Nesse caso, a fila circular tem tamanho 8. Logo, o código utilizado é o mesmo e o modelo produtor-consumir já foi explicado em mais de uma ocasião.
+
+No laboratório 4, nenhuma medida foi tomada para garantir a exclusão mútua, isto é, que a fila só seria acessada pelo produtor ou pelo consumidor em um dado instante de tempo. Entretanto, utilizando threads e mutex, a exclusão mútua pode ser garantida, impendindo que um novo elemento seja consumido enquanto outro é criado. Na verdade, isso pode não ser um problema nesse caso onde há apenas um consumidor e um produtor. Entretanto, um mutex para bloquear o acesso do produtor e do consumidor à fila enquanto a fila estiver sendo usada pelo consumidor ou pelo produtor já foi incluído e servirá para o exercício 4.
+
+Quando a fila fica cheia, o produtor deve ser interrompido e deve permanecer parado esperando que o consumidor consuma um elemento da fila para que haja espaço para que o produtor volte a produzir. Por outro lado, se a fila está vazia, o consumidor deve ser interrompido e aguardar que o produtor consuma algo para que o consumidor possa voltar a consumir. Esse controle foi implementado utilizando mutex de thread e uma variável de condição de thread. O mutex lock é utilizado como parâmetro da função pthread_cond_wait que também usa uma variável de condição can_produce. O mutex lock deve ter sido utilizado em pthread_mutex_lock(&lock), ou seja, deve ter sido feito lock nele, para que o lock possa ser usado em pthread_cond_wait. No caso do consumidor, o mesmo mutex foi utilizado e uma outra variável de condição can_consume para quando a fila está vazia. Em ambos os casos, quando esse bloqueio condicional ocorre, o mutex accesslock deve ser desbloqueado (unlock) para que outro produtor ou consumidor possa acessar a fila caso possa. Ao término do bloqueio condicional, o mutex lock deve ser desbloqueado através de pthread_mutex_unlock(&lock). Quando o consumidor produz um elemento na fila vazia, o consumidor é notificado (producer chama a pthread_cond_signal(&can_consume)) terminando o bloqueio condicional do consumer que chama pthread_mutex_unlock no mutex lock para que o consumidor prossiga com a sua execução. Quando o consumidor consome um elemento da fila cheia, ele notifica o producer (pthread_cond_signal(&can_produce)), terminando o bloqueio condicional do producer que pode prosseguir com a sua execução e produzir. O controle em ambos o produtor e o consumidor seguem a mesma lógica.
+
+Nesse caso, o producer é uma função executada por uma thread e o consumer é uma função executada por outra thread, criadas na função main através de:
+
+	pthread_create(&threads[PRODUCER_THREAD_INDEX], NULL, producer, NULL);
+	pthread_create(&threads[CONSUMER_THREAD_INDEX], NULL, consumer, NULL);
+
+A função main aguarda o término de execução dessas threads, logo aguarda o término da atividade do consumidor e do produtor, devido às chamadas:
+
+	pthread_join(threads[CONSUMER_THREAD_INDEX],NULL);
+	pthread_join(threads[PRODUCER_THREAD_INDEX],NULL);
+
+Conforme ocorre a produção e o consumo, os valores produzidos e consumidos são armazenados em arrays diferentes produced e consumed tal que para cada índice de um array o valor armazenado no mesmo índice do outro array tem que ser igual ao valor armazenado nesse índice do primeiro array.
+
+Inicialização dos mutex de thread:
+	static pthread_mutex_t accesslock = PTHREAD_MUTEX_INITIALIZER;
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+Inicialização das variáveis condicionais de thread:
+	static pthread_cond_t can_produce = PTHREAD_COND_INITIALIZER;
+	static pthread_cond_t can_consume = PTHREAD_COND_INITIALIZER;
+
+O resultado obtido está de acordo com o esperado. O consumidor consome os inteiros na ordem em que eles são produzidos pelo consumidor. A função assert foi utilizada para verificar isso, porém isso também pode ser verificado pelo resultado impresso no terminal durante a execução.
+
+-----------------------------------------------------
+
+QUESTÃO 4) Modifique o programa anterior, para que haja 2 (ou mais)
+threads consumidor e 2 (ou mais) threads produtor. O que muda
+em relação ao uso do mutex e da variável de condição?
+
+-----------------------------------------------------
+
+ex04.c
+
+#include<stdio.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<assert.h>
+
+#define PRODUCER_MAX 64
+#define CONSUMER_MAX 64
+#define PRODUCER_THREAD_INDEX 0
+#define CONSUMER_THREAD_INDEX 1
+#define MAX_N_PRODUCERS 2
+#define MAX_N_CONSUMERS 2
+
+// Struct representing a FIFO.
+struct storage {
+
+	unsigned int *buffer;	// Buffer storing FIFO's elements
+	unsigned int max;			// Maximum number of stored elements
+	unsigned int nelem;		// Current number of stored elements
+	unsigned int head;		// Head of the FIFO.
+
+};
+
+typedef struct storage Storage;
+
+static Storage data;
+static unsigned int produced[PRODUCER_MAX];
+static unsigned int consumed[CONSUMER_MAX];
+static pthread_mutex_t accesslock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t can_produce = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t can_consume = PTHREAD_COND_INITIALIZER;
+static int producerDemand = PRODUCER_MAX - 1;
+static int consumerDemand = CONSUMER_MAX - 1;
+
+// Function for the Consumer's activities execution.
+void * consumer(void * id) {
+
+	int index = 0;
+
+	printf("\nCONSUMER STARTED!\n");
+
+	while(consumerDemand >= 0) {
+		
+		sleep(2);
+
+		pthread_mutex_lock(&accesslock);
+
+		if(consumerDemand >= 0) {
+
+			if(data.nelem == 0) {
+				//printf("\n WAIT CONSUMER\n");
+				pthread_mutex_lock(&lock);
+				pthread_mutex_unlock(&accesslock);
+				pthread_cond_wait(&can_consume, &lock);
+				pthread_mutex_unlock(&lock);
+				pthread_mutex_lock(&accesslock);
+			}
+
+			index = data.head - data.nelem;
+
+			if(index >= 0) {
+				consumed[consumerDemand] = data.buffer[index];
+			} else {
+				consumed[consumerDemand] = data.buffer[data.max + index];
+				index = data.max + index;
+			}
+
+			data.nelem--;
+
+			printf("\n\tConsumer ID<%d> reading: %d", (int)id, consumed[consumerDemand]);
+
+			if(data.nelem == data.max - 1) {
+				//printf("\n LIBERA PRODUCER\n");
+				pthread_cond_signal(&can_produce);
+			}
+
+			consumerDemand--;
+		}
+
+		pthread_mutex_unlock(&accesslock);
+
+	}
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+	pthread_exit(NULL);
+
+}
+
+// Function for the Producer's activities execution.
+void * producer(void * id) {
+
+	int index = 0;
+
+	printf("\nPRODUCER STARTED!\n");
+
+	while(producerDemand >= 0) {	
+
+		sleep(1);
+
+		pthread_mutex_lock(&accesslock);
+
+		if(producerDemand >= 0) {
+
+			if(data.nelem == data.max) {
+				//printf("\n WAIT PRODUCER\n");
+				pthread_mutex_lock(&lock);
+				pthread_mutex_unlock(&accesslock);
+				pthread_cond_wait(&can_produce, &lock);
+				pthread_mutex_unlock(&lock);
+				pthread_mutex_lock(&accesslock);
+			}
+
+			produced[producerDemand] = rand() % 65;	
+
+			data.buffer[data.head] = produced[producerDemand];
+		
+			if(data.head == data.max - 1) {
+				data.head = 0;
+			} else {
+				data.head++;
+			}
+
+			data.nelem++;
+
+			printf("\nProducer ID<%d> writing: %d", (int)id, produced[producerDemand]);
+
+			if(data.nelem == 1 ) {//&& demand < PRODUCER_MAX - 1) {
+				//printf("\nLIBERA CONSUMER\n");
+				pthread_cond_signal(&can_consume);
+			}
+
+			producerDemand--;
+		}
+
+		pthread_mutex_unlock(&accesslock);
+
+	}
+
+	printf("\n\nPRODUCER FINISHED!\n\n");
+
+	pthread_exit(NULL);
+
+}
+
+
+int main() {
+
+	pid_t parent = getpid();
+	unsigned int i = 0;
+	pthread_t pdrThreads[MAX_N_PRODUCERS];
+	pthread_t cnsThreads[MAX_N_CONSUMERS];
+
+	if(CONSUMER_MAX > PRODUCER_MAX){
+		printf("\n\nERROR: MORE CONSUMPTION THAN PRODUCTION!\n\n");
+	}
+	
+	for(i = 0; i < PRODUCER_MAX; i++) {
+		produced[i] = 0;
+	}
+
+	for(i = 0; i < CONSUMER_MAX; i++) {
+		consumed[i] = 0;
+	}
+
+	data.max 	= 8;
+	data.buffer = (int*) malloc (data.max * sizeof(int));	
+	data.nelem = 0;
+	data.head 	= 0;
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	for(i = 0; i < MAX_N_PRODUCERS; i++) {
+		pthread_create(&pdrThreads[i], NULL, producer, (void*) i);
+	}
+	
+	for(i = 0; i < MAX_N_CONSUMERS; i++) {
+		pthread_create(&cnsThreads[i], NULL, consumer, (void*) i);
+	}
+
+	for(i = 0; i < MAX_N_PRODUCERS; i++) {
+		pthread_join(pdrThreads[i],NULL);
+	}
+
+	for(i = 0; i < MAX_N_CONSUMERS; i++) {
+		pthread_join(cnsThreads[i],NULL);
+	}
+
+	printf("\n\nProduction Order:\n");
+	for(i = 0; i < PRODUCER_MAX; i++) {
+		printf("\t%d\n", produced[i]);
+	}
+
+	printf("\n\nConsumption Order:\n");
+	for(i = 0; i < CONSUMER_MAX; i++) {
+		printf("\t%d\n", consumed[i]);
+		assert(consumed[i] == produced[i]);
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o ex04 ex04.c -lpthread
+$ ./ex04
+
+-----------------------------------------------------
+
+RESULTADO
+
+===== Producer-Consumer Algorithm =====
+
+
+PRODUCER STARTED!
+
+PRODUCER STARTED!
+
+CONSUMER STARTED!
+
+CONSUMER STARTED!
+
+Producer ID<0> writing: 13
+Producer ID<1> writing: 61
+	Consumer ID<0> reading: 13
+	Consumer ID<1> reading: 61
+Producer ID<0> writing: 37
+Producer ID<1> writing: 30
+Producer ID<0> writing: 53
+Producer ID<1> writing: 40
+	Consumer ID<1> reading: 37
+Producer ID<0> writing: 51
+	Consumer ID<0> reading: 30
+Producer ID<1> writing: 42
+Producer ID<0> writing: 14
+Producer ID<1> writing: 46
+	Consumer ID<1> reading: 53
+	Consumer ID<0> reading: 40
+Producer ID<1> writing: 2
+Producer ID<0> writing: 42
+Producer ID<1> writing: 0
+Producer ID<0> writing: 4
+	Consumer ID<1> reading: 51
+	Consumer ID<0> reading: 42
+Producer ID<1> writing: 38
+Producer ID<0> writing: 1
+	Consumer ID<0> reading: 14
+Producer ID<0> writing: 35
+	Consumer ID<1> reading: 46
+Producer ID<1> writing: 36
+	Consumer ID<0> reading: 2
+	Consumer ID<1> reading: 42
+Producer ID<0> writing: 62
+Producer ID<0> writing: 11
+	Consumer ID<1> reading: 0
+Producer ID<1> writing: 46
+	Consumer ID<0> reading: 4
+Producer ID<0> writing: 8
+	Consumer ID<1> reading: 38
+Producer ID<1> writing: 42
+	Consumer ID<0> reading: 1
+Producer ID<0> writing: 29
+	Consumer ID<1> reading: 35
+Producer ID<0> writing: 42
+	Consumer ID<0> reading: 36
+Producer ID<1> writing: 5
+	Consumer ID<1> reading: 62
+	Consumer ID<0> reading: 11
+Producer ID<0> writing: 2
+Producer ID<0> writing: 3
+	Consumer ID<1> reading: 46
+	Consumer ID<0> reading: 8
+Producer ID<1> writing: 62
+Producer ID<0> writing: 30
+	Consumer ID<1> reading: 42
+Producer ID<1> writing: 9
+	Consumer ID<0> reading: 29
+Producer ID<0> writing: 12
+	Consumer ID<1> reading: 42
+	Consumer ID<0> reading: 5
+Producer ID<1> writing: 27
+Producer ID<1> writing: 48
+	Consumer ID<0> reading: 2
+Producer ID<0> writing: 44
+	Consumer ID<1> reading: 3
+Producer ID<1> writing: 17
+	Consumer ID<0> reading: 62
+	Consumer ID<1> reading: 30
+Producer ID<0> writing: 23
+Producer ID<0> writing: 31
+	Consumer ID<1> reading: 9
+Producer ID<1> writing: 61
+	Consumer ID<0> reading: 12
+Producer ID<0> writing: 37
+	Consumer ID<1> reading: 27
+	Consumer ID<0> reading: 48
+Producer ID<1> writing: 14
+Producer ID<1> writing: 63
+	Consumer ID<1> reading: 44
+Producer ID<0> writing: 16
+	Consumer ID<0> reading: 17
+Producer ID<1> writing: 14
+	Consumer ID<1> reading: 23
+	Consumer ID<0> reading: 31
+Producer ID<0> writing: 4
+Producer ID<0> writing: 57
+	Consumer ID<1> reading: 61
+Producer ID<1> writing: 18
+	Consumer ID<0> reading: 37
+Producer ID<0> writing: 39
+	Consumer ID<1> reading: 14
+Producer ID<1> writing: 30
+	Consumer ID<0> reading: 63
+Producer ID<0> writing: 15
+	Consumer ID<1> reading: 16
+	Consumer ID<0> reading: 14
+Producer ID<1> writing: 53
+Producer ID<1> writing: 11
+	Consumer ID<1> reading: 4
+	Consumer ID<0> reading: 57
+Producer ID<0> writing: 26
+Producer ID<1> writing: 30
+	Consumer ID<1> reading: 18
+	Consumer ID<0> reading: 39
+Producer ID<0> writing: 41
+Producer ID<0> writing: 3
+	Consumer ID<1> reading: 30
+	Consumer ID<0> reading: 15
+Producer ID<1> writing: 37
+Producer ID<0> writing: 45
+	Consumer ID<1> reading: 53
+	Consumer ID<0> reading: 11
+Producer ID<1> writing: 6
+Producer ID<1> writing: 36
+	Consumer ID<1> reading: 26
+	Consumer ID<0> reading: 30
+Producer ID<0> writing: 10
+Producer ID<1> writing: 15
+	Consumer ID<1> reading: 41
+Producer ID<0> writing: 49
+	Consumer ID<0> reading: 3
+Producer ID<1> writing: 37
+
+PRODUCER FINISHED!
+
+
+
+PRODUCER FINISHED!
+
+
+	Consumer ID<1> reading: 37
+	Consumer ID<0> reading: 45
+	Consumer ID<0> reading: 6
+	Consumer ID<1> reading: 36
+	Consumer ID<0> reading: 10
+	Consumer ID<1> reading: 15
+	Consumer ID<0> reading: 49
+	Consumer ID<1> reading: 37
+
+CONSUMER ENDED!
+
+
+
+CONSUMER ENDED!
+
+
+
+Production Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+Consumption Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+ ===== END OF EXECUTION! ===== 
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido é quase exatamente igual ao código desenvolvido na questão 3 desse laboratório. A única diferença é que são criadas mais threads que executam a função consumer e mais threads que executam a função producer, nomeadamente 2 threads são criadas para executar a função producer e duas threads são criadas para executar a função consumer.
+
+
+Criação de MAX_N_PRODUCERS threads que executam a função producer, produzindo elementos inteiros em uma mesma fila.
+	for(i = 0; i < MAX_N_PRODUCERS; i++) {
+		pthread_create(&pdrThreads[i], NULL, producer, (void*) i);
+	}
+
+Criação de MAX_N_CONSUMERS threads que executam a função consumer, consumindo elementos inteiros em uma mesma fila.
+	for(i = 0; i < MAX_N_CONSUMERS; i++) {
+		pthread_create(&cnsThreads[i], NULL, consumer, (void*) i);
+	}
+
+Em seguida, a função main aguarda o término de execução de cada uma dessas threads:
+
+	for(i = 0; i < MAX_N_PRODUCERS; i++) {
+		pthread_join(pdrThreads[i],NULL);
+	}
+
+	for(i = 0; i < MAX_N_CONSUMERS; i++) {
+		pthread_join(cnsThreads[i],NULL);
+	}
+
+O mutex accesslock garante que apenas uma thread que executa producer execute produzindo um novo inteiro na fila em um mesmo momento. Logo, a fila não é acessada simultaneamente por duas threads producer, nem por duas threads producer. A variável de condição é usada da mesma forma, é o mesmo código da questão 3 quanto ao uso das variáveis de condição can_produce e can_consume.
+
+Outra alteração do código necessária foi criar um contador de elementos produzidos e outro contador de elementos consumidos como variáveis globais acessadas de forma controlada pelas threads. Assim, a variável producerDemand é acessada apenas por uma thread que executa producer em um dado momento. E a variável consumerDemand também é acessada apenas por uma thread em um dado momento. Essa é a região crítica. Assim, apenas uma thread consumidor consome por vez e apenas uma thread produtor produz por vez. O resultado mostra quais valores são criados por quais threads e quais valores são consumidos por quais threads. Eventualmente pode ser utilizado mais consumidores e mais produtores, basta alterar o valor de MAX_N_PRODUCERS e MAX_N_PRODUCERS.
+
+O resultado está de acordo com o esperado, 64 valores são produzidos e consumidos na ordem em que foram produzidos. Isso é feito por duas threads consumer e duas threads producer.
+	
+-----------------------------------------------------
+

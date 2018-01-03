@@ -1,0 +1,1007 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1)  Criar, via programa, o diretório sc em seu
+diretório corrente; criar os subdiretórios a, b
+e c; Criar arquivos txt nos subdiretórios e
+escrever textos nestes arquivos.
+
+-----------------------------------------------------
+
+mkdir.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+
+struct stat fileData;
+
+int main(int argc, char** argv) {
+  
+  if(argc != 2) {
+    printf("\nInvalid number of parameters! Run: %s <NAME _OF_DIRECTORY>\n\n", argv[0]);
+    exit(-1);
+  }
+
+  if(stat(argv[1], &fileData) == -1) {
+    if(mkdir(argv[1], S_IRWXU|S_IRWXG|S_IRWXO) == 0) {
+      printf("\nDirectory %s created successfuly!\n\n", argv[1]);
+    } else {
+      printf("\nError creating directory %s => %s\n\n", argv[1], strerror(errno));
+    }
+  } else {
+    printf("\nDirectory already exists\n\n");
+  }
+
+  return 0;
+
+}
+
+
+
+
+writeFile.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<fcntl.h>
+
+int main(int argc, char** argv) {
+
+	int file;  
+
+  if(argc != 3) {
+    printf("\nInvalid number of parameters! Run: %s <PATH_OF_FILE> <TEXT>\n\n", argv[0]);
+    exit(-1);
+  }
+
+	file = open(argv[1], O_WRONLY | O_CREAT | O_SYNC, 0700);
+
+	if(file <= 0) {
+		printf("\nError: file %s could not be opened.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	if(write(file, argv[2], strlen(argv[2]) * sizeof(char)) < 0) {
+		printf("\nError: write() failed to write to file %s.\n", argv[1]);
+		exit(-1);
+	}
+
+  return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o mkdir mkdir.c
+$ ./mkdir sc
+$ ./mkdir sc/a
+$ ./mkdir sc/b
+$ ./mkdir sc/c
+$ ls
+$ gcc -g -o writeF writeFile.c
+$ ./writeF sc/a/A.txt "Hello there! This is text A in a!"
+$ ./writeF sc/a/B.txt "Hello there! This is text B in a!"
+$ ./writeF sc/a/C.txt "Hello there! This is text C in a!"
+$ ./writeF sc/b/A.txt "Hello there! This is text A in b!"
+$ ./writeF sc/b/B.txt "Hello there! This is text B in b!"
+$ ./writeF sc/b/C.txt "Hello there! This is text C in b!"
+$ ./writeF sc/c/A.txt "Hello there! This is text A in c!"
+$ ./writeF sc/c/B.txt "Hello there! This is text B in c!"
+$ ./writeF sc/c/C.txt "Hello there! This is text C in c!"
+$ ls
+cfp                            lookup        mkdir.c      sw
+changeFilePermission.c         lookUpFile    printAttr.c  writeF
+copyToFile.c                   lookUpFile.c  sc           writeFile
+INF1019_LAB11_RAFAEL_AMSC.txt  mkdir         seekWrite.c  writeFile.c
+$ cd sc
+$ ls
+a  b  c
+$ cd a
+$ ls
+A.txt  B.txt  C.txt
+$ cat A.txt 
+Hello there! This is text A in a!
+$ cat B.txt 
+Hello there! This is text B in a!
+$ cat C.txt 
+Hello there! This is text C in a!
+$ cd ..
+$ cd b
+$ cat A.txt 
+Hello there! This is text A in b!
+$ cat B.txt 
+Hello there! This is text B in b!
+$ cat C.txt 
+Hello there! This is text C in b!
+$ cd ..
+$ cd c
+$ cat A.txt 
+Hello there! This is text A in c!
+$ cat B.txt 
+Hello there! This is text B in c!
+$ cat C.txt 
+Hello there! This is text C in c! 
+ls
+A.txt  B.txt  C.txt
+$ cd ..
+$ cd b
+$ ls
+A.txt  B.txt  C.txt
+
+-----------------------------------------------------
+
+RESULTADO
+
+$ ls
+cfp                            lookup        mkdir.c      sw
+changeFilePermission.c         lookUpFile    printAttr.c  writeF
+copyToFile.c                   lookUpFile.c  sc           writeFile
+INF1019_LAB11_RAFAEL_AMSC.txt  mkdir         seekWrite.c  writeFile.c
+$ cd sc
+$ ls
+a  b  c
+$ cd a
+$ ls
+A.txt  B.txt  C.txt
+$ cat A.txt 
+Hello there! This is text A in a!
+$ cat B.txt 
+Hello there! This is text B in a!
+$ cat C.txt 
+Hello there! This is text C in a!
+$ cd ..
+$ cd b
+$ cat A.txt 
+Hello there! This is text A in b!
+$ cat B.txt 
+Hello there! This is text B in b!
+$ cat C.txt 
+Hello there! This is text C in b!
+$ cd ..
+$ cd c
+$ cat A.txt 
+Hello there! This is text A in c!
+$ cat B.txt 
+Hello there! This is text B in c!
+$ cat C.txt 
+Hello there! This is text C in c! 
+ls
+A.txt  B.txt  C.txt
+$ cd ..
+$ cd b
+$ ls
+A.txt  B.txt  C.txt
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função main que recebe como parâmetro o caminho do diretório a ser criado. Em seguida, esse caminho é usado como parâmetro da função stat que verifica se existe o diretório mencionado. Na verdade, a stat verifica se existe o arquivo especificado pelo caminho (path) fornecido, independente de ser um diretório ou um arquivo. Caso exista, a struct stat fileData passada como parâmetro passa a ter as informações sobre o arquivo do path fornecido conforme a especificação da struct stat. No caso desse primeiro exercício, a função de fato importante é a função mkdir que cria o diretório no caminho especificado pelo argv[1] (o nome do diretório está incluído nesse path). A função mkdir também recebe como parâmetro flags que indicam a permissão de acesso do diretório a ser criado. 
+
+S_IRWXU Permissão de leitura, escrita e execução para o dono (owner).
+S_IRWXG Permissão de leitura, escrita e execução para o grupo (group).
+S_IRWXO Permissão de leitura, escrita e execução para outros usuários (others).
+
+if(mkdir(argv[1], S_IRWXU|S_IRWXG|S_IRWXO) == 0) => diretório de path argv[1] deve ser criado com as três permissões habilitadas.
+
+Conforme a execução indicada e o resultado obtido, o diretório sc foi criado no diretório corrente.
+
+$ ./mkdir sc
+
+Em seguida, os diretórios a, b e c foram criados dentro do diretório sc, executando o programa da seguinte forma:
+$ ./mkdir sc/a
+$ ./mkdir sc/b
+$ ./mkdir sc/c
+
+O path passado para cada diretório a ser criado indica que o diretório deve ser criado dentro do diretório sc. E o resultado obtido é exatamente a criação dos diretórios a, b, e c dentro do diretório sc.
+
+$ cd sc
+$ ls
+a  b  c
+
+Outro programa foi desenvolvido, o writeFile.c, que recebe dois parâmetro, o primeiro que indica o caminho do arquivo que deve ser criado (ou aberto caso já exista) e o segundo parâmetro que indica o texto que deve ser escrito nesse arquivo. A função main em writeFile.c utiliza a função file = open(argv[1], O_WRONLY | O_CREAT | O_SYNC, 0700) para abrir/criar (O_CREAT) um arquivo para escrita apenas (O_WRONLY). O caminho do arquivo provém de argv[1]. O texto a ser escrito no arquivo provém de argv[2]. A função write(file, argv[2], strlen(argv[2]) * sizeof(char)) foi utilizada para escrever os strlen(argv[2]) * sizeof(char) bytes da string argv[2] no arquivo identificado por file (file tendo sido obtido a partir da função open).
+
+O módulo wirteFile foi executado três vezes para cada diretório a, b e c, criando em todos os diretórios três arquivos: A.txt, B.txt e C.txt. Cada arquivo armazena um texto semelhante "Hello there! This is file X in Y!", onde X assume valores A ou B ou C, e Y assume valores a ou b ou c; X indicando o nome do arquivo e Y indicando o diretório onde o arquivo está armazenado.
+
+Utilizando cat no terminal, pode ser observado que o conteúdo dos arquivos é exatamente o texto que deveria ter sido escrito neles após as execuções do módulo writeFile. 
+
+-----------------------------------------------------
+
+QUESTÃO 2) Exibir os atributos de um dos arquivos
+criados.
+
+-----------------------------------------------------
+
+printAttr.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<fcntl.h>
+
+struct stat fileData;
+
+int main(int argc, char** argv) {
+
+  if(argc != 2) {
+    printf("\nInvalid number of parameters! Run: %s <PATH_OF_DIRECTORY/FILE>\n\n", argv[0]);
+    exit(-1);
+  }
+
+	if(stat(argv[1], &fileData) == -1) {
+		printf("\nError: file %s does not exist.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	printf("\n==============================================\n");
+	printf("\n\tAttributes of File: %s\n", argv[1]);
+	printf("\n==============================================\n");
+
+	printf("\nID of device containing file: %ld", fileData.st_dev);
+	printf("\ninode number: %ld", fileData.st_ino);
+	printf("\nProtection: %ld", fileData.st_mode);
+	printf("\nNumber of hard links: %ld", fileData.st_nlink);
+	printf("\nUser ID of owner: %ld", fileData.st_uid);
+	printf("\nGroup ID of owner: %ld", fileData.st_gid);
+	printf("\nDevice ID (if special file): %ld", fileData.st_rdev);
+	printf("\nTotal size, in bytes: %ld", fileData.st_size);
+	printf("\nBlocksize for file system I/O: %ld", fileData.st_blksize);
+	printf("\nNumber of 512B blocks allocated: %ld", fileData.st_blocks);
+	printf("\nTime of last access: %ld", fileData.st_atime);
+	printf("\nTime of last modification: %ld", fileData.st_mtime);
+	printf("\nTime of last status change: %ld", fileData.st_ctime);
+
+	printf("\n\n==============================================\n\n");
+
+  return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o printAttr printAttr.c
+$ ./printAttr sc
+$ ./printAttr sc/a/A.txt
+
+-----------------------------------------------------
+
+RESULTADO
+
+./printAttr sc
+
+==============================================
+
+	Attributes of File: sc
+
+==============================================
+
+ID of device containing file: 2056
+inode number: 2060856
+Protection: 16893
+Number of hard links: 5
+User ID of owner: 1000
+Group ID of owner: 1000
+Device ID (if special file): 0
+Total size, in bytes: 4096
+Blocksize for file system I/O: 4096
+Number of 512B blocks allocated: 8
+Time of last access: 1512087449
+Time of last modification: 1512087444
+Time of last status change: 1512087444
+
+==============================================
+
+$ ./printAttr sc/a/A.txt
+
+==============================================
+
+	Attributes of File: sc/a/A.txt
+
+==============================================
+
+ID of device containing file: 2056
+inode number: 2058297
+Protection: 33216
+Number of hard links: 1
+User ID of owner: 1000
+Group ID of owner: 1000
+Device ID (if special file): 0
+Total size, in bytes: 33
+Blocksize for file system I/O: 4096
+Number of 512B blocks allocated: 8
+Time of last access: 1512128167
+Time of last modification: 1512128121
+Time of last status change: 1512128121
+
+==============================================
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código do arquivo printAttr.c utiliza a função stat e uma struct stat fileData para carregar na struct fileData as
+informações (metadados) do arquivo especificado pelo parâmetro argv[1] recebido pela main.
+A main recebe um parâmetro que indica o caminho/path do arquivo ou diretório cujos atributos devem ser impressos.
+
+struct stat {
+    dev_t     st_dev;     /* ID of device containing file */
+    ino_t     st_ino;     /* inode number */
+    mode_t    st_mode;    /* protection */
+    nlink_t   st_nlink;   /* number of hard links */
+    uid_t     st_uid;     /* user ID of owner */
+    gid_t     st_gid;     /* group ID of owner */
+    dev_t     st_rdev;    /* device ID (if special file) */
+    off_t     st_size;    /* total size, in bytes */
+    blksize_t st_blksize; /* blocksize for file system I/O */
+    blkcnt_t  st_blocks;  /* number of 512B blocks allocated */
+    time_t    st_atime;   /* time of last access */
+    time_t    st_mtime;   /* time of last modification */
+    time_t    st_ctime;   /* time of last status change */
+};
+
+As informações da struct stat fileData foram todas impressas após um retorno positivo da função stat.
+A descrição de cada atributo dispensa explicações visto estar suficientemente descrita.
+
+Observa-se que os atributos tanto do diretório sc quanto do arquivo A.txt são coerentes.
+Ambos exibem o mesmo ID do dispositivo que os contém, conforme esperado dado que ambos estão armazenados no mesmo dispositivo.
+O tamanho do bloco para o sistema de arquivo I/O é exatamente igual o tamanho em bytes do diretório sc, conforme esperado.
+inode de ambos têm valores diferente, algo também esperado uma vezes que são arquivos diferentes.
+
+-----------------------------------------------------
+
+QUESTÃO 3)  Buscar um dado arquivo a partir do diretório
+sc, ler e imprimir o conteúdo do arquivo
+encontrado.
+
+-----------------------------------------------------
+
+lookUpFile.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<fcntl.h>
+#include<dirent.h>
+#include<limits.h>
+
+void printFile(char *currentPath) {
+
+	printf("\n\nFound file! %s\n\n", currentPath);
+
+	int file = 0;
+	char r = '0';
+
+	if(currentPath == NULL) {
+		printf("\n\nError printFile: currentPath is NULL.\n\n");
+		return;
+	} 
+
+	file = open(currentPath, O_RDONLY | O_CREAT | O_SYNC, 0700);
+
+	if(file <= 0) {
+		printf("\nError: file %s could not be found in this directory.\n\n", currentPath);
+		exit(-1);
+	}
+
+	while(read(file, &r, 1) > 0) {
+		printf("%c", r);
+	}
+
+	return;
+}
+
+int searchDirectory(char *currentPath, char *fileName) {
+
+	DIR *dir = opendir(currentPath);
+	struct dirent *directoryEnt;
+	struct stat fileData;
+
+
+	if(dir == NULL) {
+		printf("\n\nError: Directory %s could not be opened.\n\n", currentPath);
+		exit(-1);
+	}
+
+	if(stat(currentPath, &fileData) == -1) {
+		printf("\n\nError searchDirectory: file does not exist in directory (1) (%s).\n\n", currentPath);
+		return -1;
+	}
+
+	do {
+
+		directoryEnt = readdir(dir);
+
+		if(directoryEnt) {
+
+			char filePath[PATH_MAX + 1];
+
+			if(strcpy(filePath, currentPath) == NULL) {
+				printf("\n\nError searchDirectory: strcpy failed.\n\n");
+				return -1;
+			}
+
+			if(strcat(filePath, "/") == NULL) {
+				printf("\n\nError searchDirectory: strcat failed.\n\n");
+				return -1;
+			}
+
+			if(strcat(filePath, directoryEnt->d_name) == NULL) {
+				printf("\n\nError searchDirectory: strcat failed (1).\n\n");
+				return -1;
+			}
+
+			if(stat(filePath, &fileData) == -1) {
+				printf("\n\nError searchDirectory: file does not exist in directory (2) (%s).\n\n", currentPath);
+				return -1;
+			}
+
+			if(S_ISDIR(fileData.st_mode) && 
+					strcmp(directoryEnt->d_name, ".") != 0 && 
+					strcmp(directoryEnt->d_name, "..") != 0) {
+
+				searchDirectory(filePath, fileName);
+				
+			} else {
+
+				if(strcmp(directoryEnt->d_name, fileName) == 0) {
+
+					printFile(filePath);
+
+				}
+
+			}
+		}
+
+	} while(directoryEnt != NULL);
+	
+	return 1;
+
+}
+
+int main(int argc, char** argv) {
+
+	char currentPath[PATH_MAX + 1];
+
+  if(argc != 2) {
+    printf("\nInvalid number of parameters! Run: %s <NAME_OF_FILE>\n\n", argv[0]);
+    exit(-1);
+  }
+
+	if(getcwd(currentPath, sizeof(currentPath)) == NULL) {
+		printf("\n\nError: current working directory could not be determined by getcwd()!\n\n");
+		exit(-1);
+	}
+
+	searchDirectory(currentPath, argv[1]);
+
+	printf("\n\n");
+
+  return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o lookup lookUpFile.c
+$ ./lookup A.txt
+$ ./lookup B.txt
+$ ./lookup C.txt
+
+-----------------------------------------------------
+
+RESULTADO
+
+./lookup A.txt
+
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/b/A.txt
+
+Hello there! This is text A in b!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/c/A.txt
+
+Hello there! This is text A in c!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/a/A.txt
+
+Hello there! This is text A in a!
+
+./lookup B.txt
+
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/b/B.txt
+
+Hello there! This is text B in b!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/c/B.txt
+
+Hello there! This is text B in c!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/a/B.txt
+
+Hello there! This is text B in a!
+
+./lookup C.txt
+
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/b/C.txt
+
+Hello there! This is text C in b!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/c/C.txt
+
+Hello there! This is text C in c!
+
+Found file! /home/araphawake/Documents/PUC_RIO/SisComp/LAB11/sc/a/C.txt
+
+Hello there! This is text C in a!
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função searchDirectory(char *currentPath, char *fileName) que recebe como parâmetros o caminho do diretório
+onde ficheiros com nome fileName devem ser identificados e o conteúdo deles deve ser impresso. Essa função é recursiva, de forma que sempre que
+um diretório é encontrado, ela é chamada com o parâmetro currentPath igual ao caminho desse diretório encontrado. Assim, a partir de uma busca
+por arquivos com o nome fileName, a função searchDirectory é chamada para fazer busca dentro de cada diretório encontrado. Assim, todos os arquivos
+de nome fileName são encontrados nos diretórios e sub-diretórios. Quando um arquivo de nome fileName é encontrado, o seu conteúdo é impresso no terminal.
+
+A função stat é utilizada para obter a struct fileData com informações sobre o diretório de busca. Essa chamada ao stat também verifica se o diretório
+procurado existe. A função getcwd(currentPath, sizeof(currentPath)) é chamada para obter o caminho do diretório atual onde o programa foi executado. Isso é feito
+na função main que executa searchDirectory pela primeira vez passando o currentPath com o valor do caminho do diretório onde o programa foi executado
+e o nome do arquivo fornecido como parâmetro do programa no momento da execução (essa função main recebe obrigatoriamente um parâmetro, o nome do arquivo a ser
+procurado).
+
+DIR *dir = opendir(currentPath); => abre diretório especificado pelo caminho fornecido à função searchDirectory.
+
+while(houver arquivo/diretório no diretório especificado por currentPath, parâmetro da função searchDirectory) do:
+
+	directoryEnt = readdir(dir) => lê o primeiro diretório/arquivo do diretório especificado por dir.
+
+	If directoryEnt é um diretório (if(S_ISDIR(fileData.st_mode) && strcmp(directoryEnt->d_name, ".") != 0 && strcmp(directoryEnt->d_name, "..") != 0 :
+
+		searchDirectory(caminho do diretório apontado por directoryEnt, fileName); //Recursão
+
+	ELSE
+
+		printFile(caminho do arquivo apontado por directoryEnt);
+
+	end If
+
+end while
+
+fileData possui informações de cada arquivo em cada iteração do while (uso da função stat).
+
+Realizando a busca por qualquer um dos arquivos A.txt, B.txt e C.txt a partir do diretório sc,
+espera-se que o programa encontre exatamente 3 ocorrências de cada arquivo. O resultado obtido
+é exatamente esse, assim como o esperado.
+
+-----------------------------------------------------
+
+QUESTÃO 4) Alterar o conteúdo do arquivo, exibindo o
+resultado obtido. Usar a primitiva seek para
+realizar esta alteração.
+
+-----------------------------------------------------
+
+seekWrite.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<fcntl.h>
+
+struct stat fileData;
+
+int main(int argc, char** argv) {
+
+	FILE *file = NULL;  
+	char text[1024], *buffer;
+	int n = 0;
+	int r;
+
+  if(argc != 4) {
+    printf("\nInvalid number of parameters! Run: %s <PATH_OF_FILE> <OFFSET> <TEXT>\n\n", argv[0]);
+    exit(-1);
+  }
+
+	file = fopen(argv[1], "r");
+	if(file == NULL) {
+		printf("\nError: file %s could not be opened.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	r = getc(file);
+	while(r != EOF) {
+		n++;
+		r = getc(file);
+	}
+
+	buffer = (char*) malloc ((n + 1)* sizeof(char));
+	if(buffer == NULL) {
+		printf("\nBuffer allocation error!\n");
+		fclose(file);
+		exit(-1);
+	}
+
+	fclose(file);
+
+	file = fopen(argv[1], "r");
+	if(file == NULL) {
+		printf("\nError: file %s could not be opened.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	n = 0;
+	r = getc(file);
+	while( r != EOF) {
+		buffer[n] = (char)r;
+		n++;
+		r = getc(file);
+	}
+
+	buffer[n] = '\0';
+
+	fclose(file);
+
+	if(n == 0) {
+		return 0;
+	}
+
+	file = fopen(argv[1], "w+");
+
+	if(file == NULL) {
+		printf("\nError: file %s could not be opened.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	fputs(buffer, file);
+
+	if(fseek(file, strtol(argv[2], NULL, 10), SEEK_SET) < 0) {
+		printf("\nError: fseek() failed.\n");
+		exit(-1);
+	}
+
+	if(fputs(argv[3], file) < 0) {
+		printf("\nError: fputs() failed to write to file %s with offset %s.\n", argv[1], argv[2]);
+		printf("\nError: %s\n", strerror(errno));		
+		exit(-1);
+	}
+
+	fclose(file);
+
+  return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o seekW seekWrite.c
+$ ./seekW sc/a/C.txt 4 "HI BYE"
+
+-----------------------------------------------------
+
+RESULTADO
+
+./seekW sc/a/C.txt 4 "HI BYE"
+$ cd sc
+$ cd a
+$ cat C.txt 
+HellHI BYEe! This is text C in a!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma única função main que recebe três parâmetro, o caminho do arquivo a ser alterado, o valor do offset (offset da função fseek, o número de caracteres pulados em fseek) e o valor do texto (string) que deve ser escrito no arquivo de caminho fornecido e no offset fornecido. O arquivo é aberto e lido caractere a caractere, contado o número de caracteres do arquivo. Em seguida, abre-se novamente o arquivo em modo read, leitura, e lê novamente o arquivo com getc mas armazenando cada caractere em um buffer alocado com o número de caracteres calculado na primeira leitura do arquivo. Em seguida, após o buffer ter sido preenchido, a string do buffer é impressa no arquivo (cujo conteúdo foi apaga no momento em que foi aberto para escrita). Em seguida, move-se a posição de escrita no arquivo utilizando a função fseek que recebe o arquivo, o offset (o deslocamento a partir da posição atual no arquivo) e o valor de texto a ser impresso nessa posição do arquivo.
+Esse offset indica o número de char que são ignorado a partir de um ponto inicial.  
+
+fseek(file, strtol(argv[2], NULL, 10), SEEK_SET) => existe outras flags mas nesse caso a flag SEEK_SET indica que o movimento do cursor no arquivo deve ser feito de acordo com o offset a partir da posição 0 no arquivo. Logo, se offset é de 4, então no quarto caractere, a string argv[2] deve ser impressa, sobrescrevendo texto do arquivo.
+
+Original = Hello there! This is text C in a!
+Esperado = Hell(4o. char)HI BYEe! This is text C in a!
+Obtido = Hell(4o. char)HI BYEe! This is text C in a!
+
+O resultado está de acordo com o esperado.
+	
+-----------------------------------------------------
+
+QUESTÃO 5) Mudar a permissão de acesso ao arquivo.
+
+-----------------------------------------------------
+
+changeFilePermission.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<fcntl.h>
+
+struct stat fileData;
+
+int main(int argc, char** argv) {
+
+  if(argc != 3) {
+    printf("\nInvalid number of parameters! Run: %s <PATH_OF_DIRECTORY/FILE> <NEW_PERMISSION>\n\n", argv[0]);
+    exit(-1);
+  }
+
+	if(stat(argv[1], &fileData) == -1) {
+		printf("\nError: file %s does not exist.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	printf("\n==============================================\n");
+	printf("\n\tPermission of File: %s\n", argv[1]);
+	printf("\n==============================================\n");
+
+	if(fileData.st_mode & S_IRWXU) {
+		printf("\nPermission: Read, write, execute/search by owner.\n\n");
+	} 
+	if(fileData.st_mode & S_IRWXG) {
+		printf("\nPermission: Read, write, execute/search by group.\n\n");
+	}
+	if(fileData.st_mode & S_IRWXO) {
+		printf("\nPermission: Read, write, execute/search by others.\n\n");
+	}
+
+	printf("\nPermission: %x", fileData.st_mode);
+
+	printf("\n\n==============================================\n\n");
+	printf("\nAfter changing file permission to %s...\n\n", argv[2]);
+
+
+	if(strcmp(argv[2], "S_IRWXU") == 0) {
+		chmod(argv[1], S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXG") == 0) {
+		chmod(argv[1], S_IRWXG);
+	} else if(strcmp(argv[2], "S_IRWXO") == 0) {
+		chmod(argv[1], S_IRWXO);
+	} else if(strcmp(argv[2], "S_IRWXU|S_IRWXG") == 0) {
+		chmod(argv[1], S_IRWXU | S_IRWXG);
+	} else if(strcmp(argv[2], "S_IRWXG|S_IRWXU") == 0) {
+		chmod(argv[1], S_IRWXU | S_IRWXG);
+	} else if(strcmp(argv[2], "S_IRWXU|S_IRWXO") == 0) {
+		chmod(argv[1], S_IRWXU | S_IRWXO);
+	} else if(strcmp(argv[2], "S_IRWXO|S_IRWXU") == 0) {
+		chmod(argv[1], S_IRWXU | S_IRWXO);
+	} else if(strcmp(argv[2], "S_IRWXG|S_IRWXO") == 0) {
+		chmod(argv[1], S_IRWXG | S_IRWXO);
+	} else if(strcmp(argv[2], "S_IRWXO|S_IRWXG") == 0) {
+		chmod(argv[1], S_IRWXG | S_IRWXO);
+	} else if(strcmp(argv[2], "S_IRWXO|S_IRWXG|S_IRWXU") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXG|S_IRWXO|S_IRWXU") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXO|S_IRWXU|S_IRWXG") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXU|S_IRWXO|S_IRWXG") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXU|S_IRWXG|S_IRWXO") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else if(strcmp(argv[2], "S_IRWXG|S_IRWXU|S_IRWXO") == 0) {
+		chmod(argv[1], S_IRWXO | S_IRWXG | S_IRWXU);
+	} else {
+		printf("\nPermission %s not recognized!\n\n", argv[2]);
+	}
+
+	if(stat(argv[1], &fileData) == -1) {
+		printf("\nError: file %s does not exist.\n\n", argv[1]);
+		exit(-1);
+	}
+
+	printf("\n==============================================\n");
+	printf("\n\tPermission of File: %s\n", argv[1]);
+	printf("\n==============================================\n");
+
+	if(fileData.st_mode & S_IRWXU) {
+		printf("\nPermission: Read, write, execute/search by owner.\n\n");
+	}
+
+	if(fileData.st_mode & S_IRWXG) {
+		printf("\nPermission: Read, write, execute/search by group.\n\n");
+	} 
+
+	if(fileData.st_mode & S_IRWXO) {
+		printf("\nPermission: Read, write, execute/search by others.\n\n");
+	}
+
+	printf("\nPermission: %x", fileData.st_mode);
+
+	printf("\n\n==============================================\n\n");
+
+  return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -g -o cfp changeFilePermission.c
+$ ./cfp sc/a "S_IRWXU|S_IRWXG"
+$ ./cfp sc/b/A.txt "S_IRWXG|S_IRWXO"
+$ ./cfp sc/c/B.txt "S_IRWXO"
+
+-----------------------------------------------------
+
+RESULTADO
+
+$ ./cfp sc/a "S_IRWXU|S_IRWXG"
+
+==============================================
+
+	Permission of File: sc/a
+
+==============================================
+
+Permission: Read, write, execute/search by owner.
+
+
+Permission: Read, write, execute/search by group.
+
+
+Permission: Read, write, execute/search by others.
+
+
+Permission: 41fd
+
+==============================================
+
+
+After changing file permission to S_IRWXU|S_IRWXG...
+
+
+==============================================
+
+	Permission of File: sc/a
+
+==============================================
+
+Permission: Read, write, execute/search by owner.
+
+
+Permission: Read, write, execute/search by group.
+
+
+Permission: 41f8
+
+==============================================
+
+
+
+
+
+
+$ ./cfp sc/b/A.txt "S_IRWXG|S_IRWXO"
+
+==============================================
+
+	Permission of File: sc/b/A.txt
+
+==============================================
+
+Permission: Read, write, execute/search by owner.
+
+
+Permission: Read, write, execute/search by group.
+
+
+Permission: Read, write, execute/search by others.
+
+
+Permission: 81ff
+
+==============================================
+
+
+After changing file permission to S_IRWXG|S_IRWXO...
+
+
+==============================================
+
+	Permission of File: sc/b/A.txt
+
+==============================================
+
+Permission: Read, write, execute/search by group.
+
+
+Permission: Read, write, execute/search by others.
+
+
+Permission: 803f
+
+==============================================
+
+
+
+
+
+
+$ ./cfp sc/c/B.txt "S_IRWXO"
+
+==============================================
+
+	Permission of File: sc/c/B.txt
+
+==============================================
+
+Permission: Read, write, execute/search by owner.
+
+
+Permission: Read, write, execute/search by group.
+
+
+Permission: Read, write, execute/search by others.
+
+
+Permission: 81ff
+
+==============================================
+
+
+After changing file permission to S_IRWXO...
+
+
+==============================================
+
+	Permission of File: sc/c/B.txt
+
+==============================================
+
+Permission: Read, write, execute/search by others.
+
+
+Permission: 8007
+
+==============================================
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido é semelhante ao código para imprimir os atributos de um arquivo. Porém, nesse caso, a função chmod(argv[1], FLAGS) é chamada indicando em FLAGS as flags de permissão do arquivo e em argv[1] o caminho do arquivo cujas permissões dvem ser alteradas. As alterações são definidas por FLAGS. Conforme mencionado, existem três flags principais S_IRWXO, S_IRWXG e S_IRWXU, já explicadas no primeiro exercício no qual os diretórios foram criados.
+
+De resto, o código utiliza função strcmp para verificar o parâmetro argv[2] que armazena a nova permissão a ser dada ao arquivo. O código espera apenas essas três flags como segundo parâmetro (ou uma combinação delas). Usando a função chmod, as permissões do arquivo são alteradas. A função stat foi usada para verificar a existência do diretório/arquivo com path em argv[1] e obter informações do arquivo, no caso as permissões do arquivo antes delas serem alteradas.
+
+Primeiro, as informações de permissão do arquivo indicado são impressas no terminal. Em seguida, após chamar chmod e alterar as permissões de arquivo com base em argv[2], a struct stat fileData é carregada novamente e a permissão obtida a partir dessa struct é impressa para os arquivos passados como parâmetros.
+
+Foram feitos testes com arquivos e diretórios. Observa-se que o resultado está de acordo com o esperado, as permissões desses arquivos foram alteradas/atualizadas de acordo com os parâmetros passados ao programa. 
+	
+-----------------------------------------------------
+

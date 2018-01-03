@@ -1,0 +1,1033 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Faça um programa para somar matrizes de
+acordo com o seguinte algoritmo
+	> O primeiro processo irá criar duas matrizes
+preenchidas e uma terceira vazia em 3 áreas
+de memória compartilhada.
+	> O seu programa deverá gerar um processo
+para o cálculo de cada linha da matriz
+solução.
+	> O processo pai deve imprimir a matriz
+solução.
+
+-----------------------------------------------------
+
+ex01.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+static void printMatrix(int rows, int cols, double* M) {
+
+	int r, c = 0;
+	int n = rows * cols;
+
+	for(r = 0; r < rows; r++) {
+		printf("\n| ");
+		for(c = r*cols; c < r*cols + cols - 1; c++) {
+			printf("\t %.5f", M[c]);
+		}
+		printf("\t %.5f \t|", M[c]);
+	}
+}
+
+
+double* somaMatrizes(int row, int col, double* A, double* B) {
+
+	int i = 0;
+	int sum = 0;
+
+	pid_t pidparent = getpid();
+	pid_t pidsibling = 0;
+	pid_t pid = 0;
+
+	int segmentR, segmentA, segmentB, j, k;
+	double *p, *a, *b;
+	int n = row * col;
+	
+	double *result = (double*) malloc(n * sizeof(double));
+
+	segmentR = shmget(IPC_PRIVATE, n * sizeof(double), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentA = shmget(IPC_PRIVATE, n * sizeof(double), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentB = shmget(IPC_PRIVATE, n * sizeof(double), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	
+	if(segmentR < 0) {
+		exit(1);
+	}
+
+	p = (double *) shmat(segmentR, 0, 0);
+
+	if(p < 0) {
+		shmctl(segmentR, IPC_RMID, 0);
+		exit(1);
+	}
+
+	if(segmentA < 0) {
+		shmdt(p);
+		shmctl(segmentR, IPC_RMID, 0);
+		exit(1);
+	}
+
+	a = (double *) shmat(segmentA, 0, 0);
+
+	if(a < 0) {
+		shmdt(p);
+		shmctl(segmentR, IPC_RMID, 0);
+		shmctl(segmentA, IPC_RMID, 0);
+		exit(1);
+	}
+
+	if(segmentB < 0) {
+		shmdt(p);
+		shmctl(segmentR, IPC_RMID, 0);
+		shmdt(a);
+		shmctl(segmentA, IPC_RMID, 0);
+		exit(1);
+	}
+
+	b = (double *) shmat(segmentB, 0, 0);
+
+	if(b < 0) {
+		shmdt(p);
+		shmctl(segmentR, IPC_RMID, 0);
+		shmdt(a);
+		shmctl(segmentA, IPC_RMID, 0);
+		shmctl(segmentB, IPC_RMID, 0);
+		exit(1);
+	}
+
+	for(k = 0; k < n; k++) {
+		a[k] = A[k];
+		b[k] = B[k];
+	}
+
+
+	if(row >= 0) {
+
+		for(k = 0; k < row; k++) {
+
+			pid = fork();
+
+			if(pid > 0) {
+				// Parent
+				if(k == row - 1) {
+					waitpid(pid, 0, 0);
+				
+					printf("\nPAI <PID %d>: Resultado da Matriz Soma LINHA 0 a LINHA %d :\n", getpid()
+		 																												, row);
+					for(j = 0; j <= k; j++) {
+						printf("| ");
+						for(i = j*col; i < (j*col) + col; i++) {
+							printf("\t %.5f", p[i]);
+
+							result[i] = p[i];
+
+						}
+						printf("\t |\n");
+					}
+				}
+
+				pidsibling = pid;
+
+			} else if(pid == 0) {
+				// Child
+
+				if(k > 0) {
+					waitpid(pidsibling, 0, 0);
+				}
+
+				printf("\nFILHO <PID %d> de PAI <PID %d> e Irmão <PID %d>: Matriz Soma LINHA %d :\n | ", 
+							getpid(), 
+							pidparent, 
+							pidsibling,
+							k + 1);
+
+				for(i = k*col; i < (k*col) + col; i++) {
+					p[i] = a[i] + b[i];
+					printf("\t %.5f, %d", p[i], i);
+				}
+
+				printf("\t|\n");
+				shmdt(p);
+				shmdt(a);
+				shmdt(b);
+				exit(0);
+			} else {
+				shmdt(p);
+				shmctl(segmentR, IPC_RMID, 0);
+				shmdt(a);
+				shmctl(segmentA, IPC_RMID, 0);
+				shmdt(b);
+				shmctl(segmentB, IPC_RMID, 0);
+				exit(2);
+
+			}
+		
+		}
+
+	}
+
+	shmdt(p);
+	shmctl(segmentR, IPC_RMID, 0);
+	shmdt(a);
+	shmctl(segmentA, IPC_RMID, 0);
+	shmdt(b);
+	shmctl(segmentB, IPC_RMID, 0);
+
+	return result;
+}
+
+int main() {
+
+	double M[] = {1, 3.9, 2, 2, -3, 2.5, 90, -11, 3.6};
+
+	double N[] = {23, -45, 8.2, 2, 6, 2.9, -9.5, 34, 83.5};
+
+	double A[] = {1, 3.9, 2, 5, 2, -3, 2.5, 5.4, -8, 11, 16.7, -52, 90, -11, 3.6, 22};
+
+	double B[] = {23, -45, 8.2, 75.5, 2, 6, 2.9, 3, -8.9, 1.1, 167, -5.2, -9.5, 34, 83.5, 11};
+
+	double C[] = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
+
+	double D[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+
+	double *result;
+
+	printMatrix(3, 3, M);
+	printf("\n\n + \n\n");
+	printMatrix(3, 3, N);
+	printf("\n\n");
+	result = somaMatrizes(3, 3, M, N);
+
+	printf("\n\nM + N = R\n");
+	printMatrix(3, 3, result);
+	printf("\n\n");
+
+	printf("\n\n");
+	printMatrix(4, 4, C);
+	printf("\n\n + \n\n");
+	printMatrix(4, 4, C);
+	printf("\n\n");
+	result = somaMatrizes(4, 4, C, C);
+	
+	printf("\n\nC + C = R\n");
+	printMatrix(4, 4, result);
+	printf("\n\n");
+
+	printf("\n\n");
+	printMatrix(4, 4, D);
+	printf("\n\n + \n\n");
+	printMatrix(4, 4, C);
+	printf("\n\n");
+	result = somaMatrizes(4, 4, D, C);
+
+	printf("\n\nD + C = R\n");
+	printMatrix(4, 4, result);
+	printf("\n\n");
+
+	printf("\n\n");
+	printMatrix(4, 4, A);
+	printf("\n\n + \n\n");
+	printMatrix(4, 4, B);
+	printf("\n\n");
+	result = somaMatrizes(4, 4, A, B);
+	printf("\n\n");
+
+	printf("\n\nA + B = R\n");
+	printMatrix(4, 4, result);
+	printf("\n\n");
+
+	free(result);
+	result = NULL;
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex01 ex01.c
+$ ./ex01
+
+-----------------------------------------------------
+
+RESULTADO
+
+| 	 1.00000	 3.90000	 2.00000 	|
+| 	 2.00000	 -3.00000	 2.50000 	|
+| 	 90.00000	 -11.00000	 3.60000 	|
+
+ + 
+
+
+| 	 23.00000	 -45.00000	 8.20000 	|
+| 	 2.00000	 6.00000	 2.90000 	|
+| 	 -9.50000	 34.00000	 83.50000 	|
+
+
+FILHO <PID 17731> de PAI <PID 17730> e Irmão <PID 0>: Matriz Soma LINHA 1 :
+ | 	 24.00000, 0	 -41.10000, 1	 10.20000, 2	|
+
+FILHO <PID 17732> de PAI <PID 17730> e Irmão <PID 17731>: Matriz Soma LINHA 2 :
+ | 	 4.00000, 3	 3.00000, 4	 5.40000, 5	|
+
+FILHO <PID 17733> de PAI <PID 17730> e Irmão <PID 17732>: Matriz Soma LINHA 3 :
+ | 	 80.50000, 6	 23.00000, 7	 87.10000, 8	|
+
+PAI <PID 17730>: Resultado da Matriz Soma LINHA 0 a LINHA 3 :
+| 	 24.00000	 -41.10000	 10.20000	 |
+| 	 4.00000	 3.00000	 5.40000	 |
+| 	 80.50000	 23.00000	 87.10000	 |
+
+
+M + N = R
+
+| 	 24.00000	 -41.10000	 10.20000 	|
+| 	 4.00000	 3.00000	 5.40000 	|
+| 	 80.50000	 23.00000	 87.10000 	|
+
+
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+ + 
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+
+FILHO <PID 17734> de PAI <PID 17730> e Irmão <PID 0>: Matriz Soma LINHA 1 :
+ | 	 20.00000, 0	 20.00000, 1	 20.00000, 2	 20.00000, 3	|
+
+FILHO <PID 17735> de PAI <PID 17730> e Irmão <PID 17734>: Matriz Soma LINHA 2 :
+ | 	 20.00000, 4	 20.00000, 5	 20.00000, 6	 20.00000, 7	|
+
+FILHO <PID 17736> de PAI <PID 17730> e Irmão <PID 17735>: Matriz Soma LINHA 3 :
+ | 	 20.00000, 8	 20.00000, 9	 20.00000, 10	 20.00000, 11	|
+
+FILHO <PID 17737> de PAI <PID 17730> e Irmão <PID 17736>: Matriz Soma LINHA 4 :
+ | 	 20.00000, 12	 20.00000, 13	 20.00000, 14	 20.00000, 15	|
+
+PAI <PID 17730>: Resultado da Matriz Soma LINHA 0 a LINHA 4 :
+| 	 20.00000	 20.00000	 20.00000	 20.00000	 |
+| 	 20.00000	 20.00000	 20.00000	 20.00000	 |
+| 	 20.00000	 20.00000	 20.00000	 20.00000	 |
+| 	 20.00000	 20.00000	 20.00000	 20.00000	 |
+
+
+C + C = R
+
+| 	 20.00000	 20.00000	 20.00000	 20.00000 	|
+| 	 20.00000	 20.00000	 20.00000	 20.00000 	|
+| 	 20.00000	 20.00000	 20.00000	 20.00000 	|
+| 	 20.00000	 20.00000	 20.00000	 20.00000 	|
+
+
+
+
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+
+ + 
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+
+FILHO <PID 17738> de PAI <PID 17730> e Irmão <PID 0>: Matriz Soma LINHA 1 :
+
+ | 	 11.00000, 0	 11.00000, 1	 11.00000, 2	 11.00000, 3	|
+FILHO <PID 17739> de PAI <PID 17730> e Irmão <PID 17738>: Matriz Soma LINHA 2 :
+
+FILHO <PID 17740> de PAI <PID 17730> e Irmão <PID 17739>: Matriz Soma LINHA 3 :
+ | 	 11.00000, 4	 11.00000, 5	 11.00000, 6	 11.00000, 7	|
+ | 	 11.00000, 8	 11.00000, 9	 11.00000, 10	 11.00000, 11	|
+
+FILHO <PID 17741> de PAI <PID 17730> e Irmão <PID 17740>: Matriz Soma LINHA 4 :
+ | 	 11.00000, 12	 11.00000, 13	 11.00000, 14	 11.00000, 15	|
+
+PAI <PID 17730>: Resultado da Matriz Soma LINHA 0 a LINHA 4 :
+| 	 11.00000	 11.00000	 11.00000	 11.00000	 |
+| 	 11.00000	 11.00000	 11.00000	 11.00000	 |
+| 	 11.00000	 11.00000	 11.00000	 11.00000	 |
+| 	 11.00000	 11.00000	 11.00000	 11.00000	 |
+
+
+D + C = R
+
+| 	 11.00000	 11.00000	 11.00000	 11.00000 	|
+| 	 11.00000	 11.00000	 11.00000	 11.00000 	|
+| 	 11.00000	 11.00000	 11.00000	 11.00000 	|
+| 	 11.00000	 11.00000	 11.00000	 11.00000 	|
+
+
+
+
+| 	 1.00000	 3.90000	 2.00000	 5.00000 	|
+| 	 2.00000	 -3.00000	 2.50000	 5.40000 	|
+| 	 -8.00000	 11.00000	 16.70000	 -52.00000 	|
+| 	 90.00000	 -11.00000	 3.60000	 22.00000 	|
+
+ + 
+
+
+| 	 23.00000	 -45.00000	 8.20000	 75.50000 	|
+| 	 2.00000	 6.00000	 2.90000	 3.00000 	|
+| 	 -8.90000	 1.10000	 167.00000	 -5.20000 	|
+| 	 -9.50000	 34.00000	 83.50000	 11.00000 	|
+
+
+FILHO <PID 17742> de PAI <PID 17730> e Irmão <PID 0>: Matriz Soma LINHA 1 :
+
+FILHO <PID 17743> de PAI <PID 17730> e Irmão <PID 17742>: Matriz Soma LINHA 2 :
+ | 	 24.00000, 0	 -41.10000, 1	 10.20000, 2	 80.50000, 3	|
+
+ | 	 4.00000, 4	 3.00000, 5	 5.40000, 6	 8.40000, 7	|
+FILHO <PID 17744> de PAI <PID 17730> e Irmão <PID 17743>: Matriz Soma LINHA 3 :
+ | 	 -16.90000, 8	 12.10000, 9	 183.70000, 10	 -57.20000, 11	|
+
+FILHO <PID 17745> de PAI <PID 17730> e Irmão <PID 17744>: Matriz Soma LINHA 4 :
+ | 	 80.50000, 12	 23.00000, 13	 87.10000, 14	 33.00000, 15	|
+
+PAI <PID 17730>: Resultado da Matriz Soma LINHA 0 a LINHA 4 :
+| 	 24.00000	 -41.10000	 10.20000	 80.50000	 |
+| 	 4.00000	 3.00000	 5.40000	 8.40000	 |
+| 	 -16.90000	 12.10000	 183.70000	 -57.20000	 |
+| 	 80.50000	 23.00000	 87.10000	 33.00000	 |
+
+
+
+
+A + B = R
+
+| 	 24.00000	 -41.10000	 10.20000	 80.50000 	|
+| 	 4.00000	 3.00000	 5.40000	 8.40000 	|
+| 	 -16.90000	 12.10000	 183.70000	 -57.20000 	|
+| 	 80.50000	 23.00000	 87.10000	 33.00000 	|
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função printMatrix que recebe um vetor de double que representa uma matriz de rows linhas e cols colunas, e imprime a matriz. O array que representa a matriz armazena os valores da matriz linha seguida de linha. Isso foi feito para simplificar o algoritmo. 
+
+Há também uma função somaMAtrizes que recebe a dimensão (row x col) de duas matrizes também recebidas e calcula a soma delas utilizando 3 áreas de memória compartilhada e um processo para determinar o resultado da soma de cada linha. Cada espaço de memória armazena uma matriz. Existe três matrizes: matriz A e matriz B são as matrizes que devem ser somadas e são copiadas para áreas de memória compartilhada diferentes. O ponteiro double a possui o endereço da área de memória compartilhada onde a matriz A está copiada e o ponteiro double b possui o endereço da área de memória compartilhada onde a matriz B está copiada. O ponteiro p possui o endereço da área de memória compartilhada onde a matriz com o resultado da soma de a (área compartilhada com matriz A) e b (área compartilhada com matriz B) é armazenada. A matriz de resultado da soma é armazenada em uma área de memória compartilhada própria.
+
+Primeiramente, a função shmget(IPC_PRIVATE, n * sizeof(double), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR) é chamada três vezes, cada chamada serve para alocar memória compartilhada para uma das 3 áreas de memória compartilhada. Portanto, após chamar essa função para cada matriz, cada matriz está acessível em uma área de memória compartilhada própria. O tamanho n * sizeof(double) indica um tamanho de tantos doubles quantos termos existem na matriz que corresponde a essa área de memória sendo criada. A função retorna o IPC ID que identifica a área de memória. Esse valor é utilizado para obter o endereço da página de cada área de memória compartilhada criada. 
+
+Após a alocação do espaço de memória, a função shmat(IPC_ID, 0, 0) é chamada para recuperar o ponteiro para a área de memória (endereço para a página). Dado que as áreas de memória armazenam um conjunto de double que são os valores da matrizz correspondente, então o ponteiro recuperado deve ser um ponteiro para double, por isso p, a e b são ponteiros para double e o cast (double*) é utilizado a cada chamada de shmat.
+
+Tanto a alocação de memória compartilhada quanto a obtenção do ponteiro para cada área de memória alocada devem ser realizadas antes da chamada fork(), para que essas áreas de memória compartilha estejam anexadas ao processo pai (primeiro processo) e consequentemente os seus filhos também tenham essas áreas de memória compartilhada anexadas. Assim, os filhos têm acesso às 3 áreas de memória compartilhada criadas, podendo acessá-las através dos ponteiros p, a e b. Testes de erro foram realizados para garantir que as alocações de áreas de memórias compartilhadas tenham sido devidamente criadas e os ponteiros para cada uma tenham sido obtidos.
+
+Nas chamadas à shmget, as flags do modo de criação IPC_CREAT, IPC_EXCL são passadas como parâmetro para garantir que seja alocada a área de memória compartilhada apenas se não existir ainda uma área de memória com a chave informada. As flags S_IRUSR e S_IWUSR são usadas para dar acesso de escrita e leitura nessas áreas de memória.
+
+Após todas as áreas de memória criadas e anexadas, tendo as matrizes disponíveis nas respectivas áreas de memória, o algoritmo executa um for que iterage as row linhas e para cada iteração o processo pai cria um processo filho através de fork(). A variável pidsibling armazena o pid do último filho criado pelo processo pai para chamar waitpid(pidsibling, 0, 0), fazendo que o filho seguinte a ser criado tenha que esperar pelo fim do processo filho criado anteriormente. O primeiro processo filho criado não espera por ninguém. Assim, o processo pai cria row processos filhos e cada processo filho realiza a soma de uma linha das matrizes a e b, acessando as áreas de memória compartilha criadas (não as matrizes passadas por parâmetro). O uso de waitpid com pidsibliing garante que os processos filhos terminam em ordem das linhas e que o processo pai acessa a matriz resultado na área de memória compartilhada e imprime essa matriz apenas quando todos os seus processos filhos já tenham terminado. Isso ocorre considerando também o que está descrito no próximo parágrafo.
+
+O processo pai verifica se a linha corrente é a última linha da matriz. Caso seja, então o processo pai aguarda o término do processo filho a ser criado nessa iteração para imprimir a matriz resultado da soma armazenada na área de memória compartilhada acessível pelo ponteiro p. Os processs filhos acessam o ponteiro p para armazenar os resultados das somas de cada linha das matrizes. Antes de todo processo filho ser terminado, shmdt é chamada para desanexar as áreas de memória compartilhadas do processo filho. Ao fim da iteração, shmdt é chamada para desanexar as áreas de memória copartilhada do processo pai e shmctl é chamada para desalocar as áreas de memória compartilhada alocadas pelo processo pai. A desanexação e a desalocação são realizadas sempre em caso de erro em que o programa é terminado. A desalocação e desanexação ocorrem sempre a partir do momento em que a área de memória compartilhada não será mais necessária.
+
+Não tenho certeza se é necessário repetir, por isso repito. O fork() retorna 0 para o processo filho e o pid do processo filho para o processo pai. Isso é considerado conhecimento adquirido, por isso não devo mencionar novamente nas conclusões das questões 2 e 3. 
+
+A função main chama a função somaMatrizes para várias matrizes de dimensões diferentes. A função somaMatrizes retorna a matriz resultado que é impressa e deve ser igual à matriz impressa pelo processo pai. Os resultados abaixo demonstram isso.
+
+-----------------------------------------------------
+
+QUESTÃO 2) Mensagem do Dia
+
+Faça um programa que:
+> Leia a mensagem do dia do teclado
+> Crie uma memória compartilhada com a chave
+8180
+> Salve a mensagem na memória
+> Faça um outro programa que utilize a mesma
+chave (8180) e exiba a mensagem do dia
+para o usuário.
+
+-----------------------------------------------------
+
+DailyMessage.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+
+int main(int argc, char **argv) {
+
+	int segment;
+	char* p;
+
+	segment = shmget(strtol(argv[1], NULL, 10), 500 * sizeof(char), S_IRUSR);
+	
+	if(segment < 0) {
+		exit(2);
+	}
+
+	p = (char*) shmat(segment, 0, 0);
+
+	if(p < 0) {
+		exit(2);
+	}
+
+	printf("\n\n%sDailyMessage says: %s\n\n", argv[0], p);
+
+	shmdt(p);
+
+	return 0;
+}
+
+ex02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<string.h>
+
+int main(int argc, char * argv[]) {
+
+	pid_t pid, parentpid;
+	int segment, status;
+	char* p;
+	char* const parameters[] = {"\t", "8180", NULL};
+	char *key = "8180";
+
+	parentpid = getpid();
+
+	segment = shmget(8180, 500 * sizeof(char), IPC_CREAT | S_IRUSR | S_IWUSR);
+
+	if(segment < 0) {
+		exit(2);
+	}
+
+	p = (char *) shmat(segment, 0, 0);
+
+	if(p < 0) {
+		exit(2);
+	}
+
+	do {
+
+		printf("Aguarda nova Mensagem do Dia...");
+
+		printf("\n\nMensagem do Dia: ");
+		fgets(p, 499, stdin);
+		printf("\n\n");
+
+		if(strcmp(p, "q\n") != 0) {
+
+			pid = fork();
+
+			if(pid > 0) {
+				//Parent
+				printf("\nProcesso pai inicializado...\n");
+				printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+				printf("Pai recebe mensagem do dia: %s\n", p);
+				waitpid(pid, &status, 0);
+			} else if(pid == 0) {
+				//Child
+				printf("\tProcesso filho inicializado...\n");
+				printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+				execv("DailyMessage", parameters);
+				shmdt(p);
+				exit(0);
+			} else {
+				// Error!
+				shmdt(p);
+				shmctl(segment, IPC_RMID, 0);
+				exit(1);
+			}
+		}
+
+	} while(strcmp(p, "q\n") != 0);
+
+	printf("\n\nProcesso pai finalizado!\n\n");
+
+	shmdt(p);
+	shmctl(segment, IPC_RMID, 0);
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o DailyMessage DailyMessage.c
+$ gcc -o ex02 ex02.c
+$ ./ex02
+
+-----------------------------------------------------
+
+RESULTADO
+
+Aguarda nova Mensagem do Dia...
+
+Mensagem do Dia: Every man has in himself the most dangerous traitor of all.
+
+
+
+Processo pai inicializado...
+pid: 18237 	 pid(child): 18240
+
+Pai recebe mensagem do dia: Every man has in himself the most dangerous traitor of all.
+
+	Processo filho inicializado...
+	pid: 18240 	 pid(parent): 18237
+
+
+	DailyMessage says: Every man has in himself the most dangerous traitor of all.
+
+
+Aguarda nova Mensagem do Dia...
+
+Mensagem do Dia: Man is condemned to be free.
+
+
+
+Processo pai inicializado...
+pid: 18237 	 pid(child): 18243
+
+Pai recebe mensagem do dia: Man is condemned to be free.
+
+	Processo filho inicializado...
+	pid: 18243 	 pid(parent): 18237
+
+
+	DailyMessage says: Man is condemned to be free.
+
+
+Aguarda nova Mensagem do Dia...
+
+Mensagem do Dia: q
+
+
+
+
+Processo pai finalizado!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código fonte possui a função main que recebe um mensagem de input e essa mensagem é passada por um processo filho a um outro programa que a imprime como mensagem do dia. A função shmget foi descrita em detalhes na conclusão da questão 1. O algoritmo chama shmget para alocar uma área de memória compartilhada para armazenar a string (mensagem do dia) de entrada do input do usuário. Foi definido que essa string tem tamanho máximo de 500 caracteres. A função fgets pé chamada para aguardar o input da mensagem do dia pelo usuário. Esse input é armazenado na área de memória compartilhada (variável p é um ponteiro char e armazena o endereço da página dessa área de memória compartilhada).
+
+A requisição do input é feita dentro de um while que iterage até que o input seja "q\n". A cada iteração, o processo pai cria um processo filho pela chamada fork(). O processo pai indica que recebeu uma mensagem de input acessando através de p a área de memória compartilhada. O proceso filho executa o programa DailyMessage, através da chamada execv("DailyMessage", parameters). A variável parameters são os parâmetros argv da função main do programa DailyMessage. Portanto, parameters possui a chave da área de memória compartilhada criada (8180) e o caracter de tab "\t" para identação das mensagens do impressas por DailyMessage. O processo pai deve esperar o término da execução do processo filho para que possa novamente requisitar um novo input (mensagem do dia), caso contrário a mensagem do dia pode ser alterada antes ou durante a execução do DailyMessage uma vez que a área de memória da mensagem é uma área de memória compartilhada. Por isso, ocorre a chamada da função waitpid para fazer o processo pai esperar o término do processo filho. Porém, dado a simplicidade do programa, seria difícil o usuário introduzir um novo input antes do DailyMessage terminar de imprimir a última mensagem do dia fornecida.
+
+As funções shmdt e shmctl são chamadas com o mesmo intuito descrito na conclusão da questão 1: desanexar dos processos a área de memória compartilhada (shmdt) e por fim desalocar a área de memória compartilhada criada (shmctl). A função shmdt recebe o endereço da área de memória a ser desanexada do processo. E a função shmctl recebe o identificador da área de memória compartilhada a ser desalocada.
+
+O programa DailyMessage faz uma chamada a shmget passando a chave da área de memória recebida por parâmetro (argv). A função strtol é usada para obter o inteiro da string que possui a chave da área de memória criada. Lembrando que essa chave foi fornecida em parameters passado na chamada de execv no programa principal. A chamada a shmget utiliza apenas a flag S_IRUSR porque o DailyMessage deve ter apenas permissão de leitura e só deve ser válida se existir uma área de memória compartilhada associada a chave recebida. O DailyMessage não deve desalocar a área de memória compartilhada acessada pois o DailyMessage acessa apenas para leitura, não sendo responsável pela criação ou modificação dessa área de memória compartilhada. Por isso, shmctl não é usada. Mas shmdt(p) deve ser chamada para desanexar a área de memória compartilhada do processo do DailyMessage. A desalocação e desanexação ocorrem sempre a partir do momento em que a área de memória compartilhada não será mais necessária.
+  
+
+-----------------------------------------------------
+
+QUESTÃO 3) Faça um programa paralelo para achar a
+transposta de uma matriz.
+
+> Crie uma matriz na memória compartilhada e leia
+dados do teclado para preencher a matriz (4x4)
+> Crie outra matriz para armazenar a matriz
+transposta. Gere 4 processos para calcular a
+transposta onde cada processo deve transpor
+uma linha para a respectiva coluna da matriz
+transposta.
+> O processo pai deve imprimir a matriz original e a
+transposta.
+
+
+-----------------------------------------------------
+
+ex03.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+
+static void printMatrix(int rows, int cols, double* M) {
+
+	int r, c = 0;
+	int n = rows * cols;
+
+	for(r = 0; r < rows; r++) {
+		printf("\n| ");
+		for(c = r*cols; c < r*cols + cols - 1; c++) {
+			printf("\t %.5f", M[c]);
+		}
+		printf("\t %.5f \t|", M[c]);
+	}
+}
+
+
+double* transposta(int rows, int cols, double* A) {
+
+	int i, j, row;
+	int n = rows * cols;
+	pid_t parentpid = getpid();
+	pid_t pid = 0;
+	double *T, *a;
+	int segment = 0;
+	int segmentA = 0;
+	pid_t *children = (pid_t*) malloc(rows * sizeof(pid_t));
+
+	double *R = (double*) malloc(n * sizeof(double));
+
+	segment  = shmget(IPC_PRIVATE, sizeof(R), IPC_CREAT | IPC_EXCL | S_IWUSR | S_IRUSR);
+	segmentA = shmget(IPC_PRIVATE, sizeof(R), IPC_CREAT | IPC_EXCL | S_IWUSR | S_IRUSR);
+
+	if(segment < 0) {
+		exit(1);
+	}
+
+	T = (double*) shmat(segment, 0, 0);
+
+	if(T < 0) {
+   	shmctl(segment, 0, 0);
+		exit(2);
+	}
+
+	if(segmentA < 0) {
+		shmdt(T);
+		shmctl(segment, 0, 0);
+		exit(1);
+	}
+
+	a = (double*) shmat(segmentA, 0, 0);
+
+	if(a < 0) {
+		shmdt(T);
+		shmctl(segment, 0, 0);
+		shmctl(segmentA, 0, 0);
+		exit(2);
+	}
+
+	for(i = 0; i < n; i++) {
+		a[i] = A[i];
+	}
+
+	for(row = 0; row < rows; row++) {
+
+		pid = fork();
+
+		if(pid > 0) {
+			//Parent			
+			printf("\nPAI <PID %d> atribuindo transposição da linha %d para FILHO <PID %d>...\n", 
+						parentpid,
+						row,
+						pid);
+			
+			children[row] = pid;
+
+			if(row == rows - 1) {
+
+				for(j = 0; j < rows; j++) {
+					waitpid(children[j], 0, 0);
+				}
+
+				printf("\n\nMatriz Original:\n");
+				printMatrix(rows, cols, a);
+				printf("\n\nMatriz Transposta:\n");
+				printMatrix(cols, rows, T);
+				printf("\n\n");
+
+				free(children);
+				children = NULL;
+
+			}
+
+		} else if(pid == 0) {
+
+			printf("\n\tFILHO <PID %d> calculando linha %d da transposta de A...\n", getpid(), row);
+
+			for(i = 0; i < cols; i++) {
+				T[i*rows + row] = a[i + row*cols];
+			}
+
+			shmdt(T);
+			shmdt(a);
+			exit(0);
+		} else {
+			shmdt(T);
+			shmctl(segment, IPC_RMID, 0);
+			shmdt(a);
+			shmctl(segmentA, 0, 0);
+			exit(2);
+		}
+	}
+
+	if(rows > 0) {
+
+		for(row = 0; row < rows; row++) {
+			for(i = row*cols; i < row*cols + cols; i++) {
+				R[i] = T[i];
+			}
+		}
+
+	}
+
+	shmdt(T);
+	shmctl(segment, 0, 0);
+	shmdt(a);
+	shmctl(segmentA, 0, 0);
+
+	return R;
+}
+
+int main() {
+
+	// Matriz 3x3
+	double M[] = {1, 3.9, 2, 2, -3, 2.5, 90, -11, 3.6};
+
+	// Mtriz 4x4
+	double A[] = {1, 3.9, 2, 5, 2, -3, 2.5, 5.4, -8, 11, 16.7, -52, 90, -11, 3.6, 22};
+
+	// Matriz 3x5
+	double B[] = {23, -45, 8.2, 75.5, 2, 6, 2.9, 3, -8.9, 1.1, 167, -5.2, -9.5, 34, 83.5};
+
+	// Matriz 5x4
+	double C[] = {1, 1, 1, 1, 10, 10, 10, 10, 1, 1, 1, 1, 10, 10, 10, 10, 1, 1, 1, 1};
+
+	double *result;
+
+	result = transposta(3, 3, M);
+
+	printf("\n\nT(M) = \n");
+	printMatrix(3, 3, result);
+	printf("\n\n");
+
+	result = transposta(4, 4, A);
+
+	printf("\n\nT(A) = \n");
+	printMatrix(4, 4, result);
+	printf("\n\n");
+
+	result = transposta(3, 5, B);
+
+	printf("\n\nT(B) = \n");
+	printMatrix(5, 3, result);
+	printf("\n\n");
+
+	result = transposta(5, 4, C);
+
+	printf("\n\nT(C) = \n");
+	printMatrix(4, 5, result);
+	printf("\n\n");
+
+	free(result);
+	result = NULL;
+
+	return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex03 ex03.c
+$ ./ex03
+
+-----------------------------------------------------
+
+RESULTADO
+
+./ex03
+
+PAI <PID 18504> atribuindo transposição da linha 0 para FILHO <PID 18505>...
+
+PAI <PID 18504> atribuindo transposição da linha 1 para FILHO <PID 18506>...
+
+	FILHO <PID 18505> calculando linha 0 da transposta de A...
+
+PAI <PID 18504> atribuindo transposição da linha 2 para FILHO <PID 18507>...
+
+	FILHO <PID 18506> calculando linha 1 da transposta de A...
+
+	FILHO <PID 18507> calculando linha 2 da transposta de A...
+
+
+Matriz Original:
+
+| 	 1.00000	 3.90000	 2.00000 	|
+| 	 2.00000	 -3.00000	 2.50000 	|
+| 	 90.00000	 -11.00000	 3.60000 	|
+
+Matriz Transposta:
+
+| 	 1.00000	 2.00000	 90.00000 	|
+| 	 3.90000	 -3.00000	 -11.00000 	|
+| 	 2.00000	 2.50000	 3.60000 	|
+
+
+
+T(M) = 
+
+| 	 1.00000	 2.00000	 90.00000 	|
+| 	 3.90000	 -3.00000	 -11.00000 	|
+| 	 2.00000	 2.50000	 3.60000 	|
+
+
+PAI <PID 18504> atribuindo transposição da linha 0 para FILHO <PID 18508>...
+
+PAI <PID 18504> atribuindo transposição da linha 1 para FILHO <PID 18509>...
+
+	FILHO <PID 18508> calculando linha 0 da transposta de A...
+
+PAI <PID 18504> atribuindo transposição da linha 2 para FILHO <PID 18510>...
+
+PAI <PID 18504> atribuindo transposição da linha 3 para FILHO <PID 18511>...
+
+	FILHO <PID 18509> calculando linha 1 da transposta de A...
+
+	FILHO <PID 18510> calculando linha 2 da transposta de A...
+
+	FILHO <PID 18511> calculando linha 3 da transposta de A...
+
+
+Matriz Original:
+
+| 	 1.00000	 3.90000	 2.00000	 5.00000 	|
+| 	 2.00000	 -3.00000	 2.50000	 5.40000 	|
+| 	 -8.00000	 11.00000	 16.70000	 -52.00000 	|
+| 	 90.00000	 -11.00000	 3.60000	 22.00000 	|
+
+Matriz Transposta:
+
+| 	 1.00000	 2.00000	 -8.00000	 90.00000 	|
+| 	 3.90000	 -3.00000	 11.00000	 -11.00000 	|
+| 	 2.00000	 2.50000	 16.70000	 3.60000 	|
+| 	 5.00000	 5.40000	 -52.00000	 22.00000 	|
+
+
+
+T(A) = 
+
+| 	 1.00000	 2.00000	 -8.00000	 90.00000 	|
+| 	 3.90000	 -3.00000	 11.00000	 -11.00000 	|
+| 	 2.00000	 2.50000	 16.70000	 3.60000 	|
+| 	 5.00000	 5.40000	 -52.00000	 22.00000 	|
+
+
+PAI <PID 18504> atribuindo transposição da linha 0 para FILHO <PID 18512>...
+
+
+	FILHO <PID 18512> calculando linha 0 da transposta de A...
+PAI <PID 18504> atribuindo transposição da linha 1 para FILHO <PID 18513>...
+
+	FILHO <PID 18513> calculando linha 1 da transposta de A...
+
+PAI <PID 18504> atribuindo transposição da linha 2 para FILHO <PID 18514>...
+
+	FILHO <PID 18514> calculando linha 2 da transposta de A...
+
+
+Matriz Original:
+
+| 	 23.00000	 -45.00000	 8.20000	 75.50000	 2.00000 	|
+| 	 6.00000	 2.90000	 3.00000	 -8.90000	 1.10000 	|
+| 	 167.00000	 -5.20000	 -9.50000	 34.00000	 83.50000 	|
+
+Matriz Transposta:
+
+| 	 23.00000	 6.00000	 167.00000 	|
+| 	 -45.00000	 2.90000	 -5.20000 	|
+| 	 8.20000	 3.00000	 -9.50000 	|
+| 	 75.50000	 -8.90000	 34.00000 	|
+| 	 2.00000	 1.10000	 83.50000 	|
+
+
+
+T(B) = 
+
+| 	 23.00000	 6.00000	 167.00000 	|
+| 	 -45.00000	 2.90000	 -5.20000 	|
+| 	 8.20000	 3.00000	 -9.50000 	|
+| 	 75.50000	 -8.90000	 34.00000 	|
+| 	 2.00000	 1.10000	 83.50000 	|
+
+
+PAI <PID 18504> atribuindo transposição da linha 0 para FILHO <PID 18515>...
+
+	FILHO <PID 18515> calculando linha 0 da transposta de A...
+
+PAI <PID 18504> atribuindo transposição da linha 1 para FILHO <PID 18516>...
+
+	FILHO <PID 18516> calculando linha 1 da transposta de A...
+
+PAI <PID 18504> atribuindo transposição da linha 2 para FILHO <PID 18517>...
+
+PAI <PID 18504> atribuindo transposição da linha 3 para FILHO <PID 18518>...
+
+PAI <PID 18504> atribuindo transposição da linha 4 para FILHO <PID 18519>...
+
+	FILHO <PID 18517> calculando linha 2 da transposta de A...
+
+	FILHO <PID 18519> calculando linha 4 da transposta de A...
+
+	FILHO <PID 18518> calculando linha 3 da transposta de A...
+
+
+Matriz Original:
+
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+
+Matriz Transposta:
+
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+
+
+
+T(C) = 
+
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+| 	 1.00000	 10.00000	 1.00000	 10.00000	 1.00000 	|
+
+
+
+-----------------------------------------------------
+
+CONCLUSÂO
+
+O código fonte do arquivo ex03.c possui a implementação de uma função transposta que recebe uma matriz (array) e o número de linhas e colunas. Essa função é responsável por determinar a matriz transposta da matriz recebida. A função main apenas possui a definição de algumas matrizes de exemplo e a chamada da função transposta para cada uma dessas matrizes.
+
+A função transposta funciona de forma muito semelhante à função somaMatrizes da questão 1. Duas áreas de memória compartilhada são criadas, uma para armazenar a matriz de entrada (recebida pela função) e outra para armazenar a matriz transposta da matriz de entrada. Dessa forma, ambas as matrizes ficam acessíveis pelo processo pai e pelo processo filho (shmget e shmmat são chamadas no processo pai, o primeiro processo). shmget e shmat já foram explicadas na questão 1. As flags de criação utilizadas são as mesmas utilizadas na soma de matrizes dado que áreas de memórias devem ser criadas com permissão de leitura e de escrita. Após as áreas de memória compartilhada terem sido anexadas ao processo pai, ocorre a chamada fork() dentro de um for que iterage o número de elementos de linhas da matriz. Para cada iteração, logo para cada linha da matriz de entrada acessda na área de memória copartilhada onde ela foi copiada, o processo pai cria um processo filho que determina transpõe a linha da iteração da matriz acessível pelo ponteiro double a (endereço da área de memória compartilhada que possui uma cópia da matriz de entrada). O resultado da transposição é armazenado linha a linha por cada processo filho, na área de memória compartilhada acessível pelo ponteiro double T. Tanto a matriz A quanto a matriz T são acessadas pelos processos filhos e pelo processo pai.
+A matriz A não é acessada diretamente da matriz recebida por parâmetro. Os acessos são sempre nas áreas de memória compartilhada criadas. Novamente, a alocação e anexação das áreas de memória compartilhada foram realizadas antes da chamada do fork() e antes do for para que os processos filhos tenham acesso também às áreas de memória, uma vez que herdam as áreas de memória anexadas ao processo pai.
+
+A função printMatrix foi implementada para imprimir qualquer matriz armazenada em forma de array de uma dimensão. O processo pai verifica a cada iteração se a linha da corrente iteração é a última linha da amtriz. Caso seja, o processo pai verifica se todos os processos filhos já terminaram a execução e aguarda todos os processos filhos ainda em execução (chamda da função waitpid). Quando todos os filhos tiverem passado ao estado terminated, a matriz transposta e a matriz original são impressas pelo pai (a partir do acesso às áreas de memória compartilhada criadas). O pid de cada processo filho criado é armazenado em um vetor de pid_t denominado children. Quando o pai verifica que está na última iteração e que deve imprimir a matriz transposta, ele chamda waitpid para cada pid em children, garantindo que o processo pai aguarda o término de todos os processos filhos.
+
+Ao término do programa ou quando as áreas de memória compartilhada não são mais necessárias, a desanexação (shmdt) e a desalocação(shmctl) são realizadas para essas áreas de memória. A desalocação só é feita quando o programa termina, seja qual for o motivo do seu término. Os resultados demonstram a funcionalidade pretendida.
+
+-----------------------------------------------------
+

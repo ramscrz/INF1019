@@ -1,0 +1,895 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1)  Usando processos, escreva um programa C que
+implemente o problema do produtor/consumidor.
+Existem 2 consumidores. O produtor e os
+consumidores devem compartilhar os recursos do
+processo (filas e demais dados). O produtor deve
+produzir dados (números inteiros) a cada 1
+segundo colocando-os em uma fila (buffer). Os
+consumidores devem retirar dados da fila a cada 2
+segundos. O tamanho máximo da fila deve ser de
+8 elementos (MAXFILA) e tanto o produtor como
+os dois consumidores devem produzir/consumir
+64 elementos.
+
+-----------------------------------------------------
+
+ex01.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/msg.h>
+#include<sys/ipc.h>
+#include<sys/types.h>
+#include<string.h>
+#include<sys/wait.h>
+#include<unistd.h>
+#include<errno.h>
+#include<sys/stat.h>
+
+#define MESSAGE_SIZE 2
+#define MAXPROD 64
+#define MAXQUEUE 8
+#define MSGRD 0400
+#define MSGWRT 0200
+
+struct msgbuf {
+	long mtype;								/* message type, integer (must be greater than zero). */
+	char mtext[MESSAGE_SIZE];	/* message body array. */
+};
+
+typedef struct msgbuf message;
+
+int producer(int msgid, int *counter) {
+
+	int item;
+	message m;
+
+	item = rand()%100;
+	sprintf(m.mtext, "%d", item);
+	m.mtype = 1;
+
+	if(msgsnd(msgid, &m, sizeof(m.mtext), 0) == -1) {
+		printf("\nError (at producer): message could not be sent! \n%d: %s\n", errno, strerror(errno));
+		return -1;
+	}
+
+	(*counter)++;
+
+	return item;
+}
+
+int consumer(int msgid, int *counter) {
+
+	int item;
+	message m;
+
+	if(msgrcv(msgid, &m, sizeof(m.mtext), 1, IPC_NOWAIT) == -1) {
+
+		if(errno == ENOMSG) {
+			sleep(10);
+
+			if(msgrcv(msgid, &m, sizeof(m.mtext), 1, IPC_NOWAIT) == -1) {
+
+				if(errno == ENOMSG) {
+
+					printf("\nEmpty Queue!\n");
+
+					exit(1);
+
+				} else {
+
+					printf("\nError (at consumer): message could not be received! \n%d: %s\n", errno, strerror(errno));
+					exit(1);
+				}
+			}
+
+		} else {
+			printf("\nError (at consumer): message could not be received! \n%d: %s\n", errno, strerror(errno));
+			exit(1);
+		}
+	}
+
+	item = (int) strtol(m.mtext, NULL, 10);
+
+	if(item < 0) {
+		printf("\nError (at consumer): strtol failed!\n");
+		exit(1);
+	}
+
+	(*counter)++;
+
+	return item;
+}
+
+int main(int argc, char **argv) {
+
+	int pid = 0, pidO = 0, counter = 0, queueId = 0, value = 0;
+
+	if(argc == 2) {
+		queueId =  msgget(strtol(argv[1], NULL, 10), MSGRD | MSGWRT | IPC_CREAT | IPC_EXCL);
+	} else {
+		queueId =  msgget(IPC_PRIVATE, MSGRD | MSGWRT | IPC_CREAT | IPC_EXCL);
+	}
+
+	struct msqid_ds msgbuf;
+
+	if(queueId == -1) {
+		printf("\nError (at main): message queue could be created/allocated.\n");
+		exit(-1);
+	}
+
+	msgctl(queueId, IPC_SET, &msgbuf);
+
+	msgbuf.msg_qbytes = (MAXQUEUE * MESSAGE_SIZE);
+
+	pidO = fork();
+
+	if(pidO > 0) {
+
+	} else if(pidO == 0) {
+
+		while(counter < MAXPROD) {
+			sleep(2);
+			printf("\n\tConsumer 1 reads: %d \t=>\t Reading value #%d...\n", consumer(queueId, &counter), counter + 1);
+		}
+
+		exit(1);
+
+	} else {
+		printf("\nError (at main): child process could not be created.\n");
+		msgctl(queueId, IPC_RMID, NULL);
+		exit(-1);
+	}
+
+	pid = fork();
+
+	if(pid > 0) {
+
+		while(counter < MAXPROD) {
+			sleep(1);
+			printf("\nProducer writes: %d \t=>\t Writing value #%d...\n", producer(queueId, &counter), counter + 1);
+		}
+
+		waitpid(pid, NULL, 0);
+		waitpid(pidO, NULL, 0);
+
+	} else if(pid == 0) {
+
+		while(counter < MAXPROD) {
+
+			sleep(2);
+			printf("\n\t\tConsumer 2 reads: %d \t=>\t Reading value #%d...\n", consumer(queueId, &counter), counter + 1);
+		}
+
+		exit(1);
+
+	} else {
+		printf("\nError (at main): child process could not be created.\n");
+		msgctl(queueId, IPC_RMID, NULL);
+		exit(-1);
+	}
+
+	msgctl(queueId, IPC_RMID, NULL);
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex01 ex01.c
+$ ./ex01
+
+-----------------------------------------------------
+
+RESULTADO
+
+Producer writes: 83 	=>	 Writing value #1...
+
+	Consumer 1 reads: 83 	=>	 Reading value #1...
+
+Producer writes: 86 	=>	 Writing value #2...
+
+Producer writes: 77 	=>	 Writing value #3...
+
+	Consumer 1 reads: 86 	=>	 Reading value #2...
+
+Producer writes: 15 	=>	 Writing value #4...
+
+Producer writes: 93 	=>	 Writing value #5...
+
+	Consumer 1 reads: 77 	=>	 Reading value #3...
+
+Producer writes: 35 	=>	 Writing value #6...
+
+Producer writes: 86 	=>	 Writing value #7...
+
+	Consumer 1 reads: 15 	=>	 Reading value #4...
+
+Producer writes: 92 	=>	 Writing value #8...
+
+Producer writes: 49 	=>	 Writing value #9...
+
+	Consumer 1 reads: 93 	=>	 Reading value #5...
+
+Producer writes: 21 	=>	 Writing value #10...
+
+Producer writes: 62 	=>	 Writing value #11...
+
+		Consumer 2 reads: 35 	=>	 Reading value #1...
+
+	Consumer 1 reads: 86 	=>	 Reading value #6...
+
+Producer writes: 27 	=>	 Writing value #12...
+
+Producer writes: 90 	=>	 Writing value #13...
+
+		Consumer 2 reads: 92 	=>	 Reading value #2...
+
+	Consumer 1 reads: 49 	=>	 Reading value #7...
+
+Producer writes: 59 	=>	 Writing value #14...
+
+Producer writes: 63 	=>	 Writing value #15...
+
+		Consumer 2 reads: 21 	=>	 Reading value #3...
+
+	Consumer 1 reads: 62 	=>	 Reading value #8...
+
+Producer writes: 26 	=>	 Writing value #16...
+
+Producer writes: 40 	=>	 Writing value #17...
+
+		Consumer 2 reads: 27 	=>	 Reading value #4...
+
+	Consumer 1 reads: 90 	=>	 Reading value #9...
+
+Producer writes: 26 	=>	 Writing value #18...
+
+Producer writes: 72 	=>	 Writing value #19...
+
+		Consumer 2 reads: 59 	=>	 Reading value #5...
+
+	Consumer 1 reads: 63 	=>	 Reading value #10...
+
+Producer writes: 36 	=>	 Writing value #20...
+
+Producer writes: 11 	=>	 Writing value #21...
+
+		Consumer 2 reads: 26 	=>	 Reading value #6...
+
+	Consumer 1 reads: 40 	=>	 Reading value #11...
+
+Producer writes: 68 	=>	 Writing value #22...
+
+Producer writes: 67 	=>	 Writing value #23...
+
+		Consumer 2 reads: 26 	=>	 Reading value #7...
+
+	Consumer 1 reads: 72 	=>	 Reading value #12...
+
+Producer writes: 29 	=>	 Writing value #24...
+
+Producer writes: 82 	=>	 Writing value #25...
+
+		Consumer 2 reads: 36 	=>	 Reading value #8...
+
+	Consumer 1 reads: 11 	=>	 Reading value #13...
+
+Producer writes: 30 	=>	 Writing value #26...
+
+Producer writes: 62 	=>	 Writing value #27...
+
+		Consumer 2 reads: 68 	=>	 Reading value #9...
+
+	Consumer 1 reads: 67 	=>	 Reading value #14...
+
+Producer writes: 23 	=>	 Writing value #28...
+
+Producer writes: 67 	=>	 Writing value #29...
+
+		Consumer 2 reads: 29 	=>	 Reading value #10...
+
+	Consumer 1 reads: 82 	=>	 Reading value #15...
+
+Producer writes: 35 	=>	 Writing value #30...
+
+Producer writes: 29 	=>	 Writing value #31...
+
+		Consumer 2 reads: 30 	=>	 Reading value #11...
+
+	Consumer 1 reads: 62 	=>	 Reading value #16...
+
+Producer writes: 2 	=>	 Writing value #32...
+
+Producer writes: 22 	=>	 Writing value #33...
+
+
+		Consumer 2 reads: 67 	=>	 Reading value #12...
+	Consumer 1 reads: 23 	=>	 Reading value #17...
+
+Producer writes: 58 	=>	 Writing value #34...
+
+Producer writes: 69 	=>	 Writing value #35...
+
+
+	Consumer 1 reads: 29 	=>	 Reading value #18...
+		Consumer 2 reads: 35 	=>	 Reading value #13...
+
+Producer writes: 67 	=>	 Writing value #36...
+
+Producer writes: 93 	=>	 Writing value #37...
+
+
+		Consumer 2 reads: 2 	=>	 Reading value #14...
+	Consumer 1 reads: 22 	=>	 Reading value #19...
+
+Producer writes: 56 	=>	 Writing value #38...
+
+Producer writes: 11 	=>	 Writing value #39...
+
+
+		Consumer 2 reads: 69 	=>	 Reading value #15...
+	Consumer 1 reads: 58 	=>	 Reading value #20...
+
+Producer writes: 42 	=>	 Writing value #40...
+
+Producer writes: 29 	=>	 Writing value #41...
+
+	Consumer 1 reads: 67 	=>	 Reading value #21...
+
+		Consumer 2 reads: 93 	=>	 Reading value #16...
+
+Producer writes: 73 	=>	 Writing value #42...
+
+Producer writes: 21 	=>	 Writing value #43...
+
+	Consumer 1 reads: 56 	=>	 Reading value #22...
+
+		Consumer 2 reads: 11 	=>	 Reading value #17...
+
+Producer writes: 19 	=>	 Writing value #44...
+
+Producer writes: 84 	=>	 Writing value #45...
+
+	Consumer 1 reads: 42 	=>	 Reading value #23...
+
+		Consumer 2 reads: 29 	=>	 Reading value #18...
+
+Producer writes: 37 	=>	 Writing value #46...
+
+Producer writes: 98 	=>	 Writing value #47...
+
+	Consumer 1 reads: 73 	=>	 Reading value #24...
+
+		Consumer 2 reads: 21 	=>	 Reading value #19...
+
+Producer writes: 24 	=>	 Writing value #48...
+
+Producer writes: 15 	=>	 Writing value #49...
+
+	Consumer 1 reads: 19 	=>	 Reading value #25...
+
+		Consumer 2 reads: 84 	=>	 Reading value #20...
+
+Producer writes: 70 	=>	 Writing value #50...
+
+Producer writes: 13 	=>	 Writing value #51...
+
+
+	Consumer 1 reads: 37 	=>	 Reading value #26...
+		Consumer 2 reads: 98 	=>	 Reading value #21...
+
+Producer writes: 26 	=>	 Writing value #52...
+
+Producer writes: 91 	=>	 Writing value #53...
+
+	Consumer 1 reads: 24 	=>	 Reading value #27...
+
+		Consumer 2 reads: 15 	=>	 Reading value #22...
+
+Producer writes: 80 	=>	 Writing value #54...
+
+Producer writes: 56 	=>	 Writing value #55...
+
+
+	Consumer 1 reads: 70 	=>	 Reading value #28...
+		Consumer 2 reads: 13 	=>	 Reading value #23...
+
+Producer writes: 73 	=>	 Writing value #56...
+
+Producer writes: 62 	=>	 Writing value #57...
+
+
+		Consumer 2 reads: 26 	=>	 Reading value #24...
+	Consumer 1 reads: 91 	=>	 Reading value #29...
+
+Producer writes: 70 	=>	 Writing value #58...
+
+Producer writes: 96 	=>	 Writing value #59...
+
+		Consumer 2 reads: 80 	=>	 Reading value #25...
+
+	Consumer 1 reads: 56 	=>	 Reading value #30...
+
+Producer writes: 81 	=>	 Writing value #60...
+
+Producer writes: 5 	=>	 Writing value #61...
+
+
+		Consumer 2 reads: 62 	=>	 Reading value #26...
+	Consumer 1 reads: 73 	=>	 Reading value #31...
+
+Producer writes: 25 	=>	 Writing value #62...
+
+Producer writes: 84 	=>	 Writing value #63...
+
+
+		Consumer 2 reads: 70 	=>	 Reading value #27...
+	Consumer 1 reads: 96 	=>	 Reading value #32...
+
+Producer writes: 27 	=>	 Writing value #64...
+
+		Consumer 2 reads: 81 	=>	 Reading value #28...
+
+	Consumer 1 reads: 5 	=>	 Reading value #33...
+
+
+		Consumer 2 reads: 25 	=>	 Reading value #29...
+	Consumer 1 reads: 84 	=>	 Reading value #34...
+
+		Consumer 2 reads: 27 	=>	 Reading value #30...
+
+Empty Queue!
+
+Empty Queue!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função producer que recebe o identificador da fila de mensagens criada e o contador que deve ser incrementado sempre que a função producer adicionar uma nova mensagem à fila de mensagens (envio de mensagem). Há também a função consumer que recebe os mesmos parâmetros que a função consumidor, incrementando o contador counter (parâmetro da função) sempre que essa função extrair/consumir um elemento da fila de mensagens (recepção de mensagem). Assim, a função producer controla a adição de mensagens à fila de mensagens de identificação msgid (parâmetro da função) e a função consumer controla a extração/consumo de mensagens dessa fila de mensagens de identificação msgid (parâmetro da função). A função producer chama a função msgsnd para enviar uma nova mensagens para a fila de mensagens de identificação msgid. A mensagem é representada pela struct msgbuf (typedef message) que contém dois atributos, o tipo mtype da mensagem e a string mtext que contém o texto da mensagem. Assim, uma message é criada tanto em producer quanto em consumer. O tipo da mensagem é determinado atribuindo um inteiro positivo para o mtype da variável message m e o conteúdo da mensagem recebe o texto correspondente. na função producer, o tipo da mensagem é determinado como sendo 1 (m.mtype = 1), logo todas as mensagens adicionadas à fila de mensagens de identificação msgid serão do tipo 1). Um inteiro aleatório entre 0 e 100 é criado usando rand()%100. Esse inteiro é convertido para string e armazenado no atributo mtext da message m, usando sprintf(m.mtext, "%d", item). Em seguida, o endereço da message m é usado como parâmetro da chamada da função msgsnd que também recebe o valor da identificação msgid da fila de mensagens onde a mensagem m será adicionada e o tamanho do texto da mensagem (sizeof(m.mtext)). 
+
+Se a função msgsnd retornar um valor diferente de -1, então a mensagem foi corretamente adicionada à fila de mensagens de identificação msgid e o counter é incrementado para indicar que uma nova mensagem foi adicionada à fila de mensagens. na função consumer, A flag IPC_NOWAIT é usada na chamada da função msgrcv para garantir que essa função retorna imediatamente mesmo se não for possível ler uma mensagem da fila de identificação msgid. Essa função msgrcv é chamada duas vezes, caso a primeira vez a função retorne -1 (erro) e o erro seja ENOMSG (fila de mensagens de identificação msgid vazia), então a função msgrcv é chamada novamente após 10 segundos (sleep(1)). Caso a segunda tentativa de msgrcv falhe, então considera-se que não será mais produzido mensagens m para a fila de mensagens de identificação msgid, terminando o processo que chamou a função consumer (ou seja, o processo consumidor). Assim, todos os processos consumidores terminam de ser executados pelo menos 10 segundos a fila de mensagens ter permanecido vazia. Logo, a função consumer é responsável por extrair mensagens da fila de mensagens e a função producer é responsável por adicionar mensagens na fila de mensagens. Ambas as funções, no caso da função main do código fonte, recebem a mesma identificação de fila de mensagens, logo ambas as funções consumer e producer atuam na mesma fila de mensagens.
+
+Na função main, uma fila de mensagens é criada chamando msgget que recebe como parâmetros IPC_PRIVATE que fornece a chave da fila de mensagens a ser criada, e um conjunto de flags são fornecidas como parâmetro de msgget. A flag MSGRD é a flag de permissão de leitura; a flag MSGWRT é a flag de permissão de escrita; as flags IPC_CREAT e IPC_EXCL são já conhecidas de outros labs (memória compartilhada) e servem para garantir que uma nova fila de mensagens será criada. É necessário determinar o tamanho da fila de mensagens que, segundo o enunciado, deve ser de 8 inteiros. Considerando que cada inteiro é representado por 2 caractéres no máximo (rand()%100), então o tamanho da fila de mensagens deve ser de 8 * MESSAGE_SIZE * sizeof(char), onde MESSAGE_SIZE é o tamanho máximo de uma mensagens (2 caractéres). Dado que o tamanho do char é 1, então temos 8 * 2 = 16.
+Esse tamanho da fila é determinado alterando o valor de msg_qbytes da struct msqid_ds.
+Para fazer essa alteração, a função msgctl é chamada usando IPC_SET, o endereço de uma variável struct msgbuf e a identificação da fila de mensagens. A struct msgbuf possui informações acerca da fila de mensagens de identificação msgid.
+
+Conforme observado pelo resultado, todos os inteiros produzidos na função producer no processo pai são lidas pelos processos consumidores através da função consumer. Logo, o resultado está de acordo com o esperado. Há um atraso da função consumer 2 começar a extrair mensagens da fila de mensagens, isso se deve ao fato do processo consumidor 2 ser criado em outro fork após a criação do consumidor 1. Por isso o consumidor 1 começa (lembrando que há tempos de espera entre o acesso de cada processo á fila de mensagens, isto é, sleep()). Caso a fila esteja vazia, os processos consumidores não ficam vloqueados, aguardam 10 segundos e tentam novamente ler mensagem da fila de mensagens. Caso não consigam na segunda tentativa, os processos consumidores terminam a própria execução considerando que nenhum novo exlemento será escrito na fila de mensagens.
+
+O resultado está de acordo com o previsto. A função msgctl é usada no fim do programa para remover a fila de mensagens criada. A msgctl é usa a flag IPC_RMID para destruir a fila de mensagens.
+
+-----------------------------------------------------
+
+QUESTÃO 2)   Tal como no exercício anterior, implemente a troca
+de mensagens só que neste exercício as mensagens
+devem ser direcionadas para um dos consumidores.
+Assim, serão geradas 64 mensagens, sendo 32 para
+um dos consumidores e 32 para o outro.
+
+-----------------------------------------------------
+
+ex02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/msg.h>
+#include<sys/ipc.h>
+#include<sys/types.h>
+#include<string.h>
+#include<sys/wait.h>
+#include<unistd.h>
+#include<errno.h>
+#include<sys/stat.h>
+
+#define MESSAGE_SIZE 2
+#define MAXCONSONE 32
+#define MAXCONSTWO 32
+#define MAXQUEUE 8
+#define MSGRD 0400
+#define MSGWRT 0200
+
+struct msgbuf {
+	long mtype;						/* message type, integer (must be greater than zero). */
+	char mtext[MESSAGE_SIZE];	/* message body array. */
+};
+
+typedef struct msgbuf message;
+
+int producer(int msgid, int msgtype, int *counter) {
+
+	int item;
+	message m;
+
+	m.mtype = msgtype;
+	item = rand()%100;
+	sprintf(m.mtext, "%d", item);
+
+	if(msgsnd(msgid, &m, sizeof(m.mtext), 0) < 0) {
+		printf("\nError (at producer): message could not be sent! \n%d: %s\n", errno, strerror(errno));
+		exit(-1);
+	}
+
+	(*counter)++;
+
+	return item;
+}
+
+int consumer(int msgid, int msgtype, int *counter) {
+
+	int item;
+	message m;
+
+	if(msgrcv(msgid, &m, sizeof(m.mtext), msgtype, 0) < 0) {
+		printf("\nError (at consumer): message could not be received! \n%d: %s\n", errno, strerror(errno));
+	exit(-1);
+	}
+
+	item = (int) strtol(m.mtext, NULL, 10);
+
+	(*counter)++;
+
+	return item;
+}
+
+int main(int argc, char **argv) {
+
+	int pid = 0, pidSecondChild, counter = 0, queueIdOne = 0, queueIdTwo = 0;
+	int value = 0, counterOne = 0, counterTwo = 0;
+
+	if(argc == 2) {
+		queueIdOne = msgget(strtol(argv[1], NULL, 10), IPC_CREAT | IPC_EXCL | MSGRD | MSGWRT );
+	} else {
+		queueIdOne =  msgget(IPC_PRIVATE, IPC_CREAT | IPC_EXCL | MSGRD | MSGWRT );
+	}
+
+	struct msqid_ds msgbuf;
+
+	if(queueIdOne == -1) {
+		printf("\nError (at main): message queue could be created/allocated. Queue One = %d; Queue Two = %d\n", queueIdOne, queueIdOne);
+		exit(-1);
+	}
+
+	msgctl(queueIdOne, IPC_SET, &msgbuf);
+
+	msgbuf.msg_qbytes = MAXQUEUE * MESSAGE_SIZE;
+	
+	pid = fork();
+
+	if(pid > 0) {
+
+	} else if(pid == 0) {
+
+		while(counter < MAXCONSONE) {
+			sleep(2);
+			printf("\n\t\tConsumer 1 <PID %d> reads: %d \t=>\t Reading value #%d...\n", getpid(), consumer(queueIdOne, 1, &counter), counter + 1);
+		}
+
+		exit(1);
+
+	} else {
+		printf("\nError (at main): child process could not be created.\n");
+		msgctl(queueIdOne, IPC_RMID, NULL);
+		exit(-1);
+	}
+
+	pidSecondChild = fork();
+
+	if(pidSecondChild > 0) {
+
+		while(counterOne < MAXCONSONE || counterTwo < MAXCONSTWO) {
+			if(counterOne < MAXCONSONE) {
+         	sleep(1);
+				printf("\nProducer writes on Queue 1 <Consumer = Process PID %d>: %d \t=>\t Writing value #%d...\n", pid, producer(queueIdOne, 1, &counterOne), counterOne + 1);
+			}
+
+			if(counterTwo < MAXCONSTWO) {
+				sleep(1);
+				printf("\nProducer writes on Queue 2 <Consumer = Process PID %d>: %d \t=>\t Writing value #%d...\n", pidSecondChild, producer(queueIdOne, 2, &counterTwo), counterTwo + 1);
+			}
+		}
+
+      waitpid(pidSecondChild, NULL, 0);
+		waitpid(pid, NULL, 0);
+
+	} else if(pidSecondChild == 0) {
+
+		while(counter < MAXCONSTWO) {
+			sleep(2);
+			printf("\n\tConsumer 2 <PID %d> reads: %d \t=>\t Reading value #%d...\n", getpid(), consumer(queueIdOne, 2, &counter), counter + 1);
+		}
+
+		exit(1);
+
+	} else {
+		printf("\nError (at main): child process could not be created.\n");
+		msgctl(queueIdOne, IPC_RMID, NULL);
+		exit(-1);
+	}
+
+	msgctl(queueIdOne, IPC_RMID, NULL);
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex02 ex02.c
+$ ./ex02
+
+-----------------------------------------------------
+
+RESULTADO
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 83 	=>	 Writing value #1...
+
+		Consumer 1 <PID 10948> reads: 83 	=>	 Reading value #1...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 86 	=>	 Writing value #1...
+
+	Consumer 2 <PID 10949> reads: 86 	=>	 Reading value #1...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 77 	=>	 Writing value #2...
+
+		Consumer 1 <PID 10948> reads: 77 	=>	 Reading value #2...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 15 	=>	 Writing value #2...
+
+	Consumer 2 <PID 10949> reads: 15 	=>	 Reading value #2...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 93 	=>	 Writing value #3...
+
+		Consumer 1 <PID 10948> reads: 93 	=>	 Reading value #3...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 35 	=>	 Writing value #3...
+
+	Consumer 2 <PID 10949> reads: 35 	=>	 Reading value #3...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 86 	=>	 Writing value #4...
+
+		Consumer 1 <PID 10948> reads: 86 	=>	 Reading value #4...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 92 	=>	 Writing value #4...
+
+	Consumer 2 <PID 10949> reads: 92 	=>	 Reading value #4...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 49 	=>	 Writing value #5...
+
+		Consumer 1 <PID 10948> reads: 49 	=>	 Reading value #5...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 21 	=>	 Writing value #5...
+
+	Consumer 2 <PID 10949> reads: 21 	=>	 Reading value #5...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 62 	=>	 Writing value #6...
+
+		Consumer 1 <PID 10948> reads: 62 	=>	 Reading value #6...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 27 	=>	 Writing value #6...
+
+	Consumer 2 <PID 10949> reads: 27 	=>	 Reading value #6...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 90 	=>	 Writing value #7...
+
+		Consumer 1 <PID 10948> reads: 90 	=>	 Reading value #7...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 59 	=>	 Writing value #7...
+	Consumer 2 <PID 10949> reads: 59 	=>	 Reading value #7...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 63 	=>	 Writing value #8...
+
+		Consumer 1 <PID 10948> reads: 63 	=>	 Reading value #8...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 26 	=>	 Writing value #8...
+
+	Consumer 2 <PID 10949> reads: 26 	=>	 Reading value #8...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 40 	=>	 Writing value #9...
+
+		Consumer 1 <PID 10948> reads: 40 	=>	 Reading value #9...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 26 	=>	 Writing value #9...
+
+	Consumer 2 <PID 10949> reads: 26 	=>	 Reading value #9...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 72 	=>	 Writing value #10...
+
+		Consumer 1 <PID 10948> reads: 72 	=>	 Reading value #10...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 36 	=>	 Writing value #10...
+
+	Consumer 2 <PID 10949> reads: 36 	=>	 Reading value #10...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 11 	=>	 Writing value #11...
+
+		Consumer 1 <PID 10948> reads: 11 	=>	 Reading value #11...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 68 	=>	 Writing value #11...
+
+	Consumer 2 <PID 10949> reads: 68 	=>	 Reading value #11...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 67 	=>	 Writing value #12...
+
+		Consumer 1 <PID 10948> reads: 67 	=>	 Reading value #12...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 29 	=>	 Writing value #12...
+
+	Consumer 2 <PID 10949> reads: 29 	=>	 Reading value #12...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 82 	=>	 Writing value #13...
+
+		Consumer 1 <PID 10948> reads: 82 	=>	 Reading value #13...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 30 	=>	 Writing value #13...
+
+	Consumer 2 <PID 10949> reads: 30 	=>	 Reading value #13...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 62 	=>	 Writing value #14...
+
+		Consumer 1 <PID 10948> reads: 62 	=>	 Reading value #14...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 23 	=>	 Writing value #14...
+
+	Consumer 2 <PID 10949> reads: 23 	=>	 Reading value #14...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 67 	=>	 Writing value #15...
+
+		Consumer 1 <PID 10948> reads: 67 	=>	 Reading value #15...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 35 	=>	 Writing value #15...
+
+	Consumer 2 <PID 10949> reads: 35 	=>	 Reading value #15...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 29 	=>	 Writing value #16...
+
+		Consumer 1 <PID 10948> reads: 29 	=>	 Reading value #16...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 2 	=>	 Writing value #16...
+
+	Consumer 2 <PID 10949> reads: 2 	=>	 Reading value #16...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 22 	=>	 Writing value #17...
+
+		Consumer 1 <PID 10948> reads: 22 	=>	 Reading value #17...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 58 	=>	 Writing value #17...
+
+	Consumer 2 <PID 10949> reads: 58 	=>	 Reading value #17...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 69 	=>	 Writing value #18...
+
+		Consumer 1 <PID 10948> reads: 69 	=>	 Reading value #18...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 67 	=>	 Writing value #18...
+
+	Consumer 2 <PID 10949> reads: 67 	=>	 Reading value #18...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 93 	=>	 Writing value #19...
+
+		Consumer 1 <PID 10948> reads: 93 	=>	 Reading value #19...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 56 	=>	 Writing value #19...
+
+	Consumer 2 <PID 10949> reads: 56 	=>	 Reading value #19...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 11 	=>	 Writing value #20...
+
+		Consumer 1 <PID 10948> reads: 11 	=>	 Reading value #20...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 42 	=>	 Writing value #20...
+	Consumer 2 <PID 10949> reads: 42 	=>	 Reading value #20...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 29 	=>	 Writing value #21...
+
+		Consumer 1 <PID 10948> reads: 29 	=>	 Reading value #21...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 73 	=>	 Writing value #21...
+	Consumer 2 <PID 10949> reads: 73 	=>	 Reading value #21...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 21 	=>	 Writing value #22...
+
+		Consumer 1 <PID 10948> reads: 21 	=>	 Reading value #22...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 19 	=>	 Writing value #22...
+
+	Consumer 2 <PID 10949> reads: 19 	=>	 Reading value #22...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 84 	=>	 Writing value #23...
+
+		Consumer 1 <PID 10948> reads: 84 	=>	 Reading value #23...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 37 	=>	 Writing value #23...
+	Consumer 2 <PID 10949> reads: 37 	=>	 Reading value #23...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 98 	=>	 Writing value #24...
+
+		Consumer 1 <PID 10948> reads: 98 	=>	 Reading value #24...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 24 	=>	 Writing value #24...
+
+	Consumer 2 <PID 10949> reads: 24 	=>	 Reading value #24...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 15 	=>	 Writing value #25...
+
+		Consumer 1 <PID 10948> reads: 15 	=>	 Reading value #25...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 70 	=>	 Writing value #25...
+	Consumer 2 <PID 10949> reads: 70 	=>	 Reading value #25...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 13 	=>	 Writing value #26...
+
+		Consumer 1 <PID 10948> reads: 13 	=>	 Reading value #26...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 26 	=>	 Writing value #26...
+
+	Consumer 2 <PID 10949> reads: 26 	=>	 Reading value #26...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 91 	=>	 Writing value #27...
+
+		Consumer 1 <PID 10948> reads: 91 	=>	 Reading value #27...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 80 	=>	 Writing value #27...
+
+	Consumer 2 <PID 10949> reads: 80 	=>	 Reading value #27...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 56 	=>	 Writing value #28...
+
+		Consumer 1 <PID 10948> reads: 56 	=>	 Reading value #28...
+
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 73 	=>	 Writing value #28...
+	Consumer 2 <PID 10949> reads: 73 	=>	 Reading value #28...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 62 	=>	 Writing value #29...
+
+		Consumer 1 <PID 10948> reads: 62 	=>	 Reading value #29...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 70 	=>	 Writing value #29...
+
+	Consumer 2 <PID 10949> reads: 70 	=>	 Reading value #29...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 96 	=>	 Writing value #30...
+
+		Consumer 1 <PID 10948> reads: 96 	=>	 Reading value #30...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 81 	=>	 Writing value #30...
+
+	Consumer 2 <PID 10949> reads: 81 	=>	 Reading value #30...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 5 	=>	 Writing value #31...
+
+		Consumer 1 <PID 10948> reads: 5 	=>	 Reading value #31...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 25 	=>	 Writing value #31...
+
+	Consumer 2 <PID 10949> reads: 25 	=>	 Reading value #31...
+
+Producer writes on Queue 1 <Consumer = Process PID 10948>: 84 	=>	 Writing value #32...
+
+		Consumer 1 <PID 10948> reads: 84 	=>	 Reading value #32...
+
+Producer writes on Queue 2 <Consumer = Process PID 10949>: 27 	=>	 Writing value #32...
+
+	Consumer 2 <PID 10949> reads: 27 	=>	 Reading value #32...
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido é quase exatamente igual ao código desenvolvido no exercício 1. A criação da fila de mensagens usando o msgget é igual, assim como a configuração do tamanho da fila, a criação dos processos consumidores (2 processos consumidores) e a utilização das funções producer e consumer. A diferença é o fato de que 32 mensagens produzidas pelo processo pai devem ser destinadas a um dos processos filhos (consumidor) e 32 outras mensagens devem se direciondas ao outro processo filho (consumidor). Assim, o código estabelece que o processo filho consumidor 1 lê apenas mensagens do tipo 1 e o processo filho consumidor 2 lê mensagens do tipo 2. Assim, quando o produtor deve enviar uma mensagens para o consumidor 1, ao valor de mtype da mensagem m deve ser atribuído o valor 1. Se o produtor deve enviar mensagem para o consumidor 2, então ao valor de mtype da mensagem deve ser atribuído o valor 2. A função consumer chama a função msgrcv passando como parâmetro msgtyp o valor 1 (caso a função consumer deva consumir mensagens do tipo 1) ou o valor 2 (caso a função consumer deva consumir mensagens do tipo 2). Isso garante que os processos filhos consumidores podem escolher o tipo de mensagem que eles vão consumir quando chamarem a função consumer. O valor do tipo de mensagem é um parâmtro da função consumer, assim como da função producer tal que a função producer possa produzir mensagem do tipo especificado. Portanto, o processo pai chama a função msgsnd, adicionando as mensagens. 32 mensagens do tipo 1 e 32 mensagens do tipo 2 são produzidas e adicionadas à fila de mensagens, O processo consumidor 1 chama a função consumer, indicando que vai ler mensagens do tipo 2 e da mesma forma o processo filho consumidor 2 indica o tipo de mensagem que consome.
+
+O resultado obtido revela exatamente o resultado experado, sendo produzidas 32 mensagens de cada tipo que são corretamente lidas pelos respectivos processos filhos consumidores, ou seja, as mensagens produzidas do tipo 1 são consumidas pelo consumidor 1 e as mensagens do tipo 2 produzidas são consumidas pelo consumidor 2. Cada processo consumidor lê exatamente 32 inteiros produzidos pelo processo pai através da função producer. O processo pai espera os filhos terminarem de ser executados para remover a fila de mensagens criada.
+
+-----------------------------------------------------
+

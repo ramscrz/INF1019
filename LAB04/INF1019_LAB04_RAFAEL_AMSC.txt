@@ -1,0 +1,661 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Usando processos, escreva um programa C que implemente o problema do
+produtor/consumidor.
+O produtor e o consumidor devem ser filhos de um processo pai.
+O produtor deve produzir dados (números inteiros pseudo-aleatórios) a cada 1 segundo
+colocando-os em uma fila (buffer, implementação circular).
+O consumidor deve retirar dados da fila a cada 2 segundos.
+O tamanho máximo da fila deve ser de 8 elementos (MAXFILA) e tanto o produtor como o
+consumidor devem produzir/consumir 64 elementos (números inteiros de 1 a 64, por
+exemplo).
+Usar as funções pause() para o processo dormir e kill (pid, SIGCONT) para acordar o outro
+processo.
+
+-----------------------------------------------------
+
+main.c
+
+#include<stdio.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<assert.h>
+
+#define PRODUCER_MAX 64
+#define CONSUMER_MAX 64
+
+// Struct representing a FIFO.
+struct storage {
+
+	int *buffer;	// Buffer storing FIFO's elements
+	int max;			// Maximum number of stored elements
+	int nelem;		// Current number of stored elements
+	int head;		// Head of the FIFO.
+
+};
+
+typedef struct storage Storage;
+
+// Function for the Consumer's activities execution.
+void consumer(Storage *data, int *producerPid, int* artefacts) {
+
+	int demand = CONSUMER_MAX - 1;
+	int index = 0;
+
+	printf("\nCONSUMER STARTED!\n");
+
+	while(demand >= 0) {
+
+		if(data->nelem == 0) {
+			kill(getpid(), SIGSTOP);
+		}
+
+		sleep(2);
+
+		index = data->head - data->nelem; 
+
+		if(index >= 0) {
+			artefacts[demand] = data->buffer[index];
+		} else {
+			artefacts[demand] = data->buffer[data->max + index];
+			index = data->max + index;
+		}
+
+		data->nelem--;
+
+		printf("\nConsumer reading: %d", artefacts[demand]);
+
+		if(data->nelem == data->max - 1) {
+			kill(*producerPid, SIGCONT);
+		}
+
+		demand--;
+	}
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+	return;
+
+}
+
+// Function for the Producer's activities execution.
+void producer(Storage *data, int *consumerPid, int *artefacts) {
+
+	int demand = PRODUCER_MAX - 1;
+	int index = 0;
+
+	printf("\nPRODUCER STARTED!\n");
+
+	while(demand >= 0) {
+
+		artefacts[demand] = rand() % 65;		
+
+		if(data->nelem == data->max) { 
+			kill(getpid(), SIGSTOP);
+		}
+
+		sleep(1);
+
+		data->buffer[data->head] = artefacts[demand];
+		
+		if(data->head == data->max - 1) {
+			data->head = 0;
+		} else {
+			data->head++;
+		}
+
+		data->nelem++;
+
+		printf("\nProducer writing: %d", artefacts[demand]);
+
+		if(data->nelem == 1) {
+			kill(*consumerPid, SIGCONT);
+		}
+
+		demand--;
+	}
+
+	printf("\n\nPRODUCER FINISHED!\n\n");
+
+	return;
+
+}
+
+
+int main() {
+
+	pid_t parent = getpid();
+	pid_t consumerPid = 0, producerPid = 0;
+
+	int segment = 0, segmentConsumer = 0, segmentPid = 0, segmentProducer = 0, segmentBuffer = 0;
+	int segmentConsumed = 0, segmentProduced = 0;
+	int *consumerCreated, *pid, *producerId;
+	Storage *data;
+
+	int i = 0;
+
+	int *consumed, *produced;
+
+	if(CONSUMER_MAX > PRODUCER_MAX){
+		printf("\n\nERROR: MORE CONSUMPTION THAN PRODUCTION!\n\n");
+	}
+
+	segment 				= shmget(IPC_PRIVATE, sizeof(Storage), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentPid 			= shmget(IPC_PRIVATE, sizeof(pid_t), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentConsumer 	= shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentProducer 	= shmget(IPC_PRIVATE, sizeof(pid_t), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentBuffer 		= shmget(IPC_PRIVATE, 8 * sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentConsumed	= shmget(IPC_PRIVATE, CONSUMER_MAX * sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	segmentProduced   = shmget(IPC_PRIVATE, PRODUCER_MAX * sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+	if(segmentBuffer < 0 || segment < 0 || segmentPid < 0 || segmentConsumer < 0 
+		|| segmentProducer < 0 || segmentProduced < 0 || segmentConsumed < 0) {
+		
+		shmctl(segment, IPC_RMID, 0);
+		shmctl(segmentPid, IPC_RMID, 0);
+		shmctl(segmentConsumer, IPC_RMID, 0);
+		shmctl(segmentBuffer, IPC_RMID, 0);
+		shmctl(segmentConsumed, IPC_RMID, 0);
+		shmctl(segmentProduced, IPC_RMID, 0);
+		printf("\nERRO 1\n");
+
+		exit(1);
+	}
+
+	data 						= (Storage*) 	shmat(segment, 0, 0);
+	pid 						= (pid_t*) 		shmat(segmentPid, 0, 0);
+	consumerCreated = (int*) 		shmat(segmentConsumer, 0, 0);
+	producerId 			= (pid_t*) 		shmat(segmentProducer, 0, 0);
+	consumed				= (int*)			shmat(segmentConsumed, 0, 0);
+	produced				= (int*)			shmat(segmentProduced, 0, 0);
+
+	if(data < 0 || pid < 0 || consumerCreated < 0 || producerId < 0) {
+		printf("\nERRO 2\n");
+		shmdt(data);
+		shmctl(segment, IPC_RMID, 0);
+		shmdt(pid);
+		shmctl(segmentPid, IPC_RMID, 0);
+		shmdt(consumerCreated);
+		shmctl(segmentConsumer, IPC_RMID, 0);
+		shmdt(producerId);
+		shmctl(segmentProducer, IPC_RMID, 0);
+		shmdt(consumed);
+		shmctl(segmentConsumed, IPC_RMID, 0);
+		shmdt(produced);
+		shmctl(segmentProduced, IPC_RMID, 0);
+
+		exit(1);
+	}
+
+	data->buffer = (int*) shmat(segmentBuffer, 0, 0);
+
+	if(data->buffer < 0) {
+		shmdt(data);
+		shmctl(segment, IPC_RMID, 0);
+		shmdt(pid);
+		shmctl(segmentPid, IPC_RMID, 0);
+		shmdt(consumerCreated);
+		shmctl(segmentConsumer, IPC_RMID, 0);
+		shmdt(producerId);
+		shmctl(segmentProducer, IPC_RMID, 0);
+		shmctl(segmentBuffer, IPC_RMID, 0);
+		shmdt(consumed);
+		shmctl(segmentConsumed, IPC_RMID, 0);
+		shmdt(produced);
+		shmctl(segmentProduced, IPC_RMID, 0);
+
+		exit(1);
+	}
+
+	data->max 	= 8;
+	data->nelem = 0;
+	data->head 	= 0;
+
+	*consumerCreated = 0;
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	producerPid = fork();
+
+	if(producerPid > 0) {
+
+		*producerId = producerPid;
+
+	} else if(producerPid == 0) {
+
+		// Wait for the flag ConsumerCreated to be set.
+		while(consumerCreated == 0);
+		
+		producer(data, pid, produced);
+
+		shmdt(data->buffer);
+		shmdt(data);
+		shmdt(pid);
+		shmdt(consumerCreated);
+		shmdt(producerId);
+		
+		exit(0);
+
+	} else {
+		shmdt(data->buffer);
+		shmctl(segmentBuffer, IPC_RMID, 0);
+		shmdt(data);
+		shmctl(segment, IPC_RMID, 0);
+		shmdt(pid);
+		shmctl(segmentPid, IPC_RMID, 0);
+		shmdt(consumerCreated);
+		shmctl(segmentConsumer, IPC_RMID, 0);
+		shmdt(producerId);
+		shmctl(segmentProducer, IPC_RMID, 0);
+		shmdt(consumed);
+		shmctl(segmentConsumed, IPC_RMID, 0);
+		shmdt(produced);
+		shmctl(segmentProduced, IPC_RMID, 0);
+		
+		exit(1);
+	}
+
+	consumerPid = fork();
+
+	if(consumerPid > 0) {
+
+		*pid = consumerPid;
+		*consumerCreated = 1;
+		waitpid(consumerPid, NULL, 0);
+		waitpid(*producerId, NULL, 0);
+
+		printf("\n\nProduction Order:\n");
+		for(i = 0; i < PRODUCER_MAX; i++) {
+			printf("\t%d\n", produced[i]);
+		}
+
+		printf("\n\nConsumption Order:\n");
+		for(i = 0; i < CONSUMER_MAX; i++) {
+			printf("\t%d\n", consumed[i]);
+			assert(consumed[i] == produced[i]);
+		}
+
+	} else if(consumerPid == 0) {
+
+		consumer(data, &producerPid, consumed);
+		
+		shmdt(data->buffer);
+		shmdt(data);
+		shmdt(pid);
+		shmdt(consumerCreated);
+		shmdt(producerId);
+		exit(0);
+
+	} else {
+		shmdt(data->buffer);
+		shmctl(segmentBuffer, IPC_RMID, 0);
+		shmdt(data);
+		shmctl(segment, IPC_RMID, 0);
+		shmdt(pid);
+		shmctl(segmentPid, IPC_RMID, 0);
+		shmdt(consumerCreated);
+		shmctl(segmentConsumer, IPC_RMID, 0);
+		shmdt(producerId);
+		shmctl(segmentProducer, IPC_RMID, 0);
+		shmdt(consumed);
+		shmctl(segmentConsumed, IPC_RMID, 0);
+		shmdt(produced);
+		shmctl(segmentProduced, IPC_RMID, 0);
+
+		exit(1);
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	shmdt(data->buffer);
+	shmctl(segmentBuffer, IPC_RMID, 0);
+	shmdt(data);
+	shmctl(segment, IPC_RMID, 0);
+	shmdt(pid);
+	shmctl(segmentPid, IPC_RMID, 0);
+	shmdt(consumerCreated);
+	shmctl(segmentConsumer, IPC_RMID, 0);
+	shmdt(producerId);
+	shmctl(segmentProducer, IPC_RMID, 0);
+	shmdt(consumed);
+	shmctl(segmentConsumed, IPC_RMID, 0);
+	shmdt(produced);
+	shmctl(segmentProduced, IPC_RMID, 0);
+
+	return 0;
+
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o main main.c
+$ ./main
+
+-----------------------------------------------------
+
+RESULTADO
+
+===== Producer-Consumer Algorithm =====
+
+
+PRODUCER STARTED!
+
+CONSUMER STARTED!
+
+Producer writing: 13
+
+Producer writing: 61
+Producer writing: 37
+Consumer reading: 13
+Producer writing: 30
+Producer writing: 53
+Consumer reading: 61
+Producer writing: 40
+Producer writing: 51
+Consumer reading: 37
+Producer writing: 42
+Producer writing: 14
+Consumer reading: 30
+Producer writing: 46
+Producer writing: 2
+Consumer reading: 53
+Producer writing: 42
+Producer writing: 0
+Consumer reading: 40
+Producer writing: 4
+Consumer reading: 51
+Producer writing: 38
+Consumer reading: 42
+Producer writing: 1
+Consumer reading: 14
+Producer writing: 35
+Consumer reading: 46
+Producer writing: 36
+Consumer reading: 2
+Producer writing: 62
+Consumer reading: 42
+Producer writing: 11
+Consumer reading: 0
+Producer writing: 46
+Consumer reading: 4
+Producer writing: 8
+Consumer reading: 38
+Producer writing: 42
+Consumer reading: 1
+Producer writing: 29
+Consumer reading: 35
+Producer writing: 42
+Consumer reading: 36
+Producer writing: 5
+Consumer reading: 62
+Producer writing: 2
+Consumer reading: 11
+Producer writing: 3
+Consumer reading: 46
+Producer writing: 62
+Consumer reading: 8
+Producer writing: 30
+Consumer reading: 42
+Producer writing: 9
+Consumer reading: 29
+Producer writing: 12
+Consumer reading: 42
+Producer writing: 27
+Consumer reading: 5
+Producer writing: 48
+Consumer reading: 2
+Producer writing: 44
+Consumer reading: 3
+Producer writing: 17
+Consumer reading: 62
+Producer writing: 23
+Consumer reading: 30
+Producer writing: 31
+Consumer reading: 9
+Producer writing: 61
+Consumer reading: 12
+Producer writing: 37
+Consumer reading: 27
+Producer writing: 14
+Consumer reading: 48
+Producer writing: 63
+Consumer reading: 44
+Producer writing: 16
+Consumer reading: 17
+Producer writing: 14
+Consumer reading: 23
+Producer writing: 4
+Consumer reading: 31
+Producer writing: 57
+Consumer reading: 61
+Producer writing: 18
+Consumer reading: 37
+Producer writing: 39
+Consumer reading: 14
+Producer writing: 30
+Consumer reading: 63
+Producer writing: 15
+Consumer reading: 16
+Producer writing: 53
+Consumer reading: 14
+Producer writing: 11
+Consumer reading: 4
+Producer writing: 26
+Consumer reading: 57
+Producer writing: 30
+Consumer reading: 18
+Producer writing: 41
+Consumer reading: 39
+Producer writing: 3
+Consumer reading: 30
+Producer writing: 37
+Consumer reading: 15
+Producer writing: 45
+Consumer reading: 53
+Producer writing: 6
+Consumer reading: 11
+Producer writing: 36
+Consumer reading: 26
+Producer writing: 10
+Consumer reading: 30
+Producer writing: 15
+Consumer reading: 41
+Producer writing: 49
+Producer writing: 37
+
+PRODUCER FINISHED!
+
+Consumer reading: 3
+Consumer reading: 37
+Consumer reading: 45
+Consumer reading: 6
+Consumer reading: 36
+Consumer reading: 10
+Consumer reading: 15
+Consumer reading: 49
+Consumer reading: 37
+
+CONSUMER ENDED!
+
+
+
+Production Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+Consumption Order:
+	37
+	49
+	15
+	10
+	36
+	6
+	45
+	37
+	3
+	41
+	30
+	26
+	11
+	53
+	15
+	30
+	39
+	18
+	57
+	4
+	14
+	16
+	63
+	14
+	37
+	61
+	31
+	23
+	17
+	44
+	48
+	27
+	12
+	9
+	30
+	62
+	3
+	2
+	5
+	42
+	29
+	42
+	8
+	46
+	11
+	62
+	36
+	35
+	1
+	38
+	4
+	0
+	42
+	2
+	46
+	14
+	42
+	51
+	40
+	53
+	30
+	37
+	61
+	13
+
+
+ ===== END OF EXECUTION! =====
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função consumer para executar as atividades do Consumidor e uma função producer para executar as atividades do Produtor. O modelo Produtor-Consumidor consiste em executar dois processos de forma concorrente, resolvendo a condição de corrida. Os dois processos partilham um buffer (no caso uma FIFO (First In First Out)) que ordena cronologicamente um valor escrito por um processo e lido pelo outro.
+
+O programa possui uma struct para representar a FIFO. A explicação de cada parâmetro está comentada no código. 
+
+Portanto, o produtor escreve um inteiro no buffer, na posição corrente indicada pela cabeça (atributo head da struct) caso o buffer (atributo buffer da struct) não esteja cheio. Dado que o buffer é cíclico, apenas o número de elementos no buffer pode ser usado para identificar se o buffer está cheio.
+
+Se o buffer está cheio, o produtor deve ser pausado (kill(produtor_pid, SIGSTOP)) até que seja resumido ao receber um sinal SIGCONT. O consumidor deve enviar o sinal SIGCONT kill(produtor_pid, SIGSTOP) para resumir a execução do produtor, indicando que pelo menos um espaço no buffer está disponível (consumidor consumiu um dos valores do buffer) para o produtor inserir um novo inteiro produzido.
+
+Se o buffer está vazio, o consumidor deve ser pausado (kill(consumidor_pid, SIGSTOP)) até que haja pelo menos um elemento no buffer (aguarda o produtor produzir um elemento e enviar um sinal SIGCONT kill(consumidor_pid, SIGCONT) para resumir a execução do consumidor). 
+
+Durante a execução, o índice da cabeça da FIFO (head) e o número de elementos no buffer da FIFO só são atualizados após um novo elemento ter sido inserido no buffer, garantindo que o consumidor acesse concorrentemente o buffer utilizando valores de head e número de elementos para leitura de posições válidas do buffer onde há um dado atualizado para ser "consumido". Da mesma forma, o consumidor somente atualiza essas variáveis após ter retirado um valor não lido da FIFO. Isso possibilita a concorrência entre o processo produtor e o processo consumidor.
+
+A chamada fork() foi utilizada duas vezes, uma vez para criar o processo do Consumidor e outra para criar o processo Produtor. O processo Consumidor executa a função consumer e o processo Produtor executa a função producer. O processo pai aguarda o término desses processos filhos para desanexar áreas de memória compartilhadas e as desalocar. 
+
+7 áreas de memória compartilhada foram criadas:
+
+	Memória compartilhada para armazenar a struct Storage, contendo o buffer da FIFO. A FIFO deve ser compartilhada pelos processos pois ambos acessam a FIFO.
+	Memória compartilhada para armazenar os pids dos processos Consumidor e Produtor, necessários para que o Produtor possa enviar sinal SIGCONT para o processo Consumidor; e para que o processo Consumidor possa enviar sinal SIGCONT para o processo Produtor.
+	Memória compartilhada para armazenar o valor de uma flag consumerCreated, indicando que o processo Produtor pode ser iniciado pois o valor do pid do processo Consumidor já foi descoberto/determinado.
+	Memória compartilhada para um array contendo em ordem cronológica os inteiros produzidos e impressos pelo Produtor.
+	Memória compartilhada para um array contendo em ordem cronológica os inteiros produzidos e impressos pelo Consumidor.
+	Essas duas últimas áreas de memória são utilizadas para verificar no fim que o Consumidor leu os valores produzidos pelo Produtor na ordem em que o Produtor produziu os inteiros. Para isso, verifica-se que produced[i] == consumed[i] usando a função assert, para todos os i inteiros produzidos pelo Produtor e consumidos pelo Consumidor.
+
+	shmget, shmat, shmdt e shmctl já foram detalhadamente explicados no laboratório anterior e servem para alocar, anexar, desanexar e desalocar áreas de memória respectivamente. Ao fim de cada processo, as memórias compartilhadas devem ser desanexadas. E ao fim do programa, as memórias compartilhadas devem ser desanexadas e desalocadas.
+
+	O Produtor testa, após inserir um novo elemento, se a FIFO possui um elemento só elemento. Caso só possua um elemento, então o Produtor envia um sinal SIGCONT para resumir a execução do Consumidor, indicando que o Consumidor já possui elemento na FIFO para ser lido (pausado anteriormente por ausência de elemento na FIFO para ser lido).
+
+	O Consumidor testa, após retirar e ler um elemento da FIFO, se o número de elemento da FIFO é igual a capacidade máxima menos 1 (data->max - 1). Caso seja, então um sinal de SIGCONT é enviado ao Produtor indicando que a FIFO ganhou um espaço livre para que o Produtor possa inserir um novo elemento (logo o SIGCONT enviado para o Produtor, resume a execução do Produtor).
+
+Esse algoritmo poderia ficar com o processo produtor pausado indefinidamente caso, antes do SIGSTOP do processo Produtor, o consumidor consumisse um valor do buffer e chamasse kill(produtor_pid, SIGCONT). Nesse caso, o Consumidor tentaria acordar o processo Produtor antes do processo Produtor ser pausado. Assim o processo produtor é pausado indefinidamente. O mesmo pode ocorrer trocando de lugar os processos Produtor e Consumidor, ficando o processo Consumidor pausado por tempo indefinido.
+Porém, esses casos onde o algoritmo falha são extremamente raros.
+
+-----------------------------------------------------
+

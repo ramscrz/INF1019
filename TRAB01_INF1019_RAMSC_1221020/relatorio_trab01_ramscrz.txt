@@ -1,0 +1,488 @@
+
+	==============================================================
+		Relatório do Trabalho 1 de Sistemas da Computação (INF1019)
+	==============================================================
+
+Autor: Rafael Azevedo Moscoso Silva Cruz / Matrícula: 1221020
+Data: 25 de Outubro de 2017
+
+Título do Trabalho: Escalonamento em Múltiplos Níveis com Feedback (MLF)
+
+1. COMPILAÇÃO E EXECUÇÃO
+
+	COMPILAÇÃO:
+
+		gcc -g -o interpreter interpreter.c producerconsumer.c globalsettings.c
+		gcc -g -o scheduler scheduler.c producerconsumer.c PriorityQueue.c globalsettings.c
+		gcc -o program userProgram.c
+
+	EXECUÇÃO:
+
+		O executável interpreter espera obrigatoriamente receber um parâmetro indicando o nome 
+		do executável correspondente ao programa escalonador. No caso, o executável do escalonador
+		possui o nome scheduler. O segundo argumento esperado pelo executável é a identificação da
+		memória compartilhada entre o escalonador e o interpretador. Esses argumentos são obrigatórios
+		para a execução do programa interpreter.
+
+		./interpreter scheduler 9999
+
+		OBS: o executável interpreter recebe como parâmetros o nome do programa escalonador (scheduler).
+			 O segundo parâmetro recebido pelo interepreter é um inteiro que representa a identificação
+			 do segmento de memória compartilhada entre interpretador e escalonador (Comunicação IPC).
+
+		./interpreter scheduler 9999 teste00
+
+		IMPORTANTE: Entretanto, UM TERCEIRO ARGUMENTO OPCIONAL pode ser fornecido, isto é, o nome de 
+		um arquivo de teste. 
+		O terceiro argumento fornecido ao executável interpreter deve ser o nome de um arquivo texto 
+		que contenha comandos válidos exec <programa> <(parametro1, parametro2, ..., parametro3)>
+		separados por newline. Junto com os códigos fonte e esse relatório, há arquivos de teste também 
+		fornecidos que foram usados para testar esse programa. Os resultados desses testes estão abaixo.
+ 
+2. DETALHAMENTO DO PROGRAMA
+
+O trabalho proposto deve implementar um programa capaz de simular o funcionamento de um escalonador
+que realiza escalonamento em Múltiplos Níveis com Feedback (MLF). O programa é composto por dois módulos principais, nomeadamente o módulo interpreter.c e o módulo scheduler.c, o interpretador de comandos e o escalonador respectivamente.
+
+O interpretador de comandos é responsável por fazer a leitura de comandos fornecidos como entrada (lido de stdin através da função fgets ou lidos de um arquivo texto) e verificar a validade dos comandos, extraindo o nome do programa a ser executado e enumerando os parâmetros fornecidos em conjuntos que representam os tempos de rajadas do respectivo programa indicado no CPU.
+
+exec program (1, 3, 4) => O programa usuário program será executado com rajadas de processamento em CPU de 1 segundos, 3 segundos e 4 segundos, exatamente nessa ordem. Entre uma rajada e outra, ocorre sempre uma operação I/O (também simulada através do envio de um sinal SIGUSR1, identificado nesse trabalho como w4IO, nome do handler do sinal SIGUSR1).
+
+Portanto, a execução de cada programa deve ser intercalada por chamadas de I/O. O escalonador deve ser informado sobre a ocorrência de operações I/O para que possa identificar programas usuário sendo interrompidos antes do término do quantum da fila a partir da qual o atual processo de programa usuário está sendo executado. 
+
+Esse trabalho contém os seguintes módulos e arquivo de código fonte:
+
+	globalsettings.h ; globalsettings.c => contém macros do programa e uma função para escrever em um 
+																				 arquivo de log.
+
+	interpreter.c => executa as configurações iniciais; executa o processo escalonador em um processo filho criado através de uma chamada fork(); permanece constantemente aguardando uma entrada de um novo comando (chama fgets para ler novos comandos dentro de um loop ou ler de um arquivo caso o nome de um arquivo tenha sido fornecido na execução); disponibiliza os comandos lidos e interpretados para que o escalonador (scheduler) possa receber os comandos e acrescentar o processo correspondente à fila 1 de processos prontos para serem escalonados. O interpretador executa a função producer que insere na FIFO o novo comando lido, sempre que um novo comando é lido. O escalonador executa consumer para ler os comandos da FIFO.
+
+	OBS: A comunicação entre o processo escalonador e o processo interpretador é feita através de uma FIFO alocada como memória compartilhada e acessada por ambos processos através de um modelo produtor-consumidor garantir que apenas um dos processos acesse a FIFO por vez. 
+
+	scheduler.c => gerencia os processos sendo executados a cada momento de acordo com a política de escalonamento definida; está constantemente verificando se o interpretador produziu novos processos para serem incluídos na lista 1 de processos prontos para serem escalonados. Todos os processos novos são introduzidos na fila 1 de processos prontos para serem escalonados.
+
+	PriorityQueue.c ; PriorityQueue.h => módulo que representa uma fila. Esse módulo é utilizado como a implementação das filas utilizadas pelo escalonador para armazenar os processos que aguardam execução. A fila de quarentena, usada pelo escalonador para armazenar os processos em quarentena, é também implementada usando esse módulo.
+
+	producerconsumer.c ; producerconsumer.h => módulo que implementa um modelo consumidor-produtor para comunicar comandos entre dois processos, nomeadamente o processo interpretador e o processo escalonador. Esse módulo é utilizado para garantir o envio dos comandos interpretados pelo interpreter para o scheduler (escalonador), preservando a ordem de leitura dos comandos e garantindo que o acesso a esses recursos pelos processos interpreter e scheduler respeitam a regra de apenas um processo acessar um recurso da região crítica por vez. O tamanho da FIFO que armazena os comandos interpretados no modelo produtor-consumidor está definido em globalsettings.h. Esse modelo produtor-consumidor implica que o interpretador atua como produtor, introduzindo na FIFO os comandos lidos e interpretados da entrada; o escalonador atua como consumidor, lendo os comandos interpretados disponíveis na FIFO, sempre em ordem de chegada do mais velho para o mais novo (afinal FIFO significa First In First Out). Para que isso funcione, a FIFO implementada como uma struct resource armazena um conjunto de comandos representados pela struct command. A FIFO deve ser acessível ao escalonador e ao interpretador durante a execução, portanto a struct que representa a FIFO é alocada como memória compartilhada usando as funções shmget e shmat. A identificação do segmento dessa memória compartilhada é fornecida pelo usuário no momento de executar o interpretador. O escalonador e o interpretador devem conhecer essa identificação para poder obter o endereço da memória compartilhada da FIFO do modelo produtor-consumidor através de shmat. Por isso, essa identificação do segmento de memória compartilhada é fornecida pelo interpretador ao escalonador como um parâmetro passado à chamada da função execv utilizada em um processo filho do processo interpretador para executar o processo escalonador (scheduler).
+
+	userProgram.c => código fonte do programa usuário conforme especificado. Esse programa usuário utiliza uma flag mutex para garantir que o programa usuário aguarda um sinal enviado pelo escalonador indicando que o escalonador recebeu o sinal de I/O do fim da rajada. Isso garante que o programa usuário não inicia a execução de uma nova rajada sem antes o escalonador ter recebido o sinal de I/O enviado pelo programa usuário. 
+
+2.1. Interpretador (interpreter)
+	1. Aloca um segmento de memória compartilhada para armazenar uma FIFO de Comandos geriada através 
+de um modelo produtor-consumidor.
+	2. Cria um processo filho (através de fork()) onde executa o processo escalonador (scheduler) 
+através de execv, passando como argumento de execv:
+		a) A identificação do segmento de memória compartilhada alocada pelo interpretador para armazenar a FIFO de comandos lidos e interpretados;
+		b) O PID do processo interpretador (interpreter) para que o escalonador possa se comunicar com o interpretador através de sinais. O interpretador, pai do processo do escalonador, já conhece o PID do processo escalonador.
+	3. Fica aguardando entrada (comandos) dentro de um loop, fazendo leitura em stdin usando a função fgets ou fazendo a leitura de um arquivo. Sempre que um comando correto é lido, o parser (função parseCommand) interpreta e valida o comando para que o interpretador possa chamar a função produtor que insere o novo comando, resultante da interpretação do comando de entrada, na FIFO de comandos interpretados. O escalonador deve chamar a função consumer para fazer a leitura de valores da FIFO.
+
+Caso o interpretador receba como entrada a string "quit\n", o interpretador e o escalonador, assim como os processos usuário sendo escalonados, são terminados e mortos.
+
+2.2. Escalonador (scheduler)
+
+	1. Lê o PID do processo pai, no caso o PID do interpretador, e a identificação do segmento de memória compartilhada da FIFO utilizada pelo interpretador em um modelo produtor-consumidor.
+
+	OBS: O PID do processo interpretador precisa ser conhecido pelo processo escalonador porque no modelo produtor-consumidor, os processos se comunicam usando sinais SIGSTOP e SIGCONT.
+
+	2. Cria as filas de processos prontos para serem executados, nomeadamente filas F1, F2 e F3. A fila Quarentena também é criada para armazenar temporariamente processos bloqueados após uma operação de I/O.
+	3. Define os handlers dos sinais SIGUSR1 (sinal que indica que ocorreu uma operação de I/O no processo usuário em execução) e SIGCHLD (sinal que indica que um processo filho, isto é um processo usuário, terminou de ser executado, iniciando um processo de reap). O handler de SIGCHLD foi definido utilizando sigaction para evitar que sinais SIGSTOP também executassem o handler. Quando um sinal SIGCHLD é recebido, o handler desse sinal atribui REAPED a flag processRunning, indicando que há um processo terminado que precisa ser eliminado do sistema. O loop do escalonador, identifica o valor REAPED da flag e elimina o processo das filas de prioridade. 
+	O escalonador executa em um loop infinito e está constantemente verificando o valor dessa flag. Se o valor for REAPED, então o processo que foi executado mais recentemente não é inserido em nenhuma das filas, nem na fila de quarentena, sendo assim excluído de todas as filas de prioridade do escalonador e eliminado do escalonador. Se o tempo que falta para I/O for igual ou menor que o tempo do quantum da fila do processo sendo executado, então antes do escalonador interromper a execução do processo atual sendo escalonado, ele aguarda o sinal de I/O do programa usuário. Para isso, é utilizada uma flag waitSignal que fica em busca ocupada (while) até o valor dessa flag ser alterado pelo handler do sinal de I/O SIGUSR1 a ser enviado pelo processo usu[ario em execução. Essa flag foi utilizada para garantir que o processo usuário não seja interrompido exatamente antes do envio do sinal de I/O e para que logo após o processo ser interrompido, o escalonador já tenha sido informado da ocorrência de I/O. Quando um sinal de I/O é recebido, a flag processRunning é atualizada indicando que o processo usu[ario deve ser introduzido na fila de quarentena e um contador é incrementado indicando que há um novo processo na fila de quarentena. O escalonador sempre que verifica que essa variável tem valor diferente de 0, ele transfere o processo mais antigo da fila de quarentena para a respectiva fila de prioridade de processos do escalonador (F1, F2 ou F3). Os processos são representados por structs que possuem um campo indicando a fila a qual pertencem. Esse campo da struct é utilizado para definir a fila onde o processo bloqueado será inserido ao fim do seu tempo de quarentena. Quando o sinal SIGUSR1 ocorre, o respectivo handler envia um sinal SIGSTOP para o processo em execução (utilizando kill(currentPid, SIGSTOP)) e uma variável flag processRunning recebe o valor 0, indicando ao escalonador que o processo parou por operação I/O antes do término do tempo de quantum da fila a partir da qual o processo foi executado pelo escalonador. 
+	A partir do valor 1 ou 0 da variável processRunning, o escalonador determina a fila onde o processo vai ser inserido após o tempo de quarentena de 3 segundos. Portanto, caso tenha ocorrido I/O, o processo é inserido na fla de quarentena com o valor de fila atualizado. Caso contrário, o processo excedeu o tempo de quantum da fila e ele é inserido na fila de prioridade abaixo (com menor prioridade).
+	4. Executa um loop infinito verificando se há novos processos na FIFO compartilhada com o interpretador; verificando se há processos na fila de quarentena que já cumpriram o tempo de quarentena e devem ser inseridos novamente na respectiva fila de prioridade F1, F2 ou F3; verificando se há processos aguardando na fila atual de prioridade; escalonando os processos das filas em ordem cíclica F1, F2 e F3, ignorando filas vazias.
+	5. Inicia a execução de novos processos obtidos a partir da leitura da FIFO através do modelo produtor-consumidor. Cada processo é executado como um processo filho do escalonador, logo um processo neto do interpretador. A função fork() é utilizada para criar o processo filho onde execv é utilizado para executar o novo processo. Os parâmetros passados em execv são o PID do processo escalonador (para envio do sinal SIGUSR1 do processo filho (usuário) para o escalonador, indicando operação I/O) e os tempos de rajada do processo. O processo usuário lê os tempos de rajada e executa os comandos for respeitando esses valores de rajada de CPU.
+
+2.3. Programa Usuário
+	1. Lê os tempos de rajada de CPU e o PID do processo escalonador.
+	2. Executa cada rajada de CPU, emitindo um sinal SIGUSR1 (ocorrência de I/O nesse caso) para o
+		 processo escalonador.
+	3. Antes de iniciar uma nova rajada, o programa usuário aguarda um sinal SIGUSR2 indicando que o
+		 o processo escalonador já recebeu o sinal de I/O. Isso garante o sincronismo da comunicação
+ 		 entre o processo usuário e o processo escalonador.
+
+OBS1: o programa usa uma variável de tempo quarantineTime para contar o tempo passado e sempre que soma pelo menos 3 segundos (soma cada quantum que ocorre por escalonamento). A variável futureQuarantineTime indica o valor de segundos dos 3 segundos sendo partilhados por outros processos também bloqueados. Essas variáveis só são incrementadas com os valores de quantum se a fila de quarentena não estiver vazia. No loop infinito do escalonador, essas variáveis são verificadas e sempre que quarantineTime tem valor igual ou maior que 3, o processo mais antigo da fila de Quarentena é inserido na respectiva fila (a fila de destino foi armazenada no próprio processo quando ele foi inserido na fila de quarentena).
+
+OBS1: O programa possui duas MACROS que podem ser utilizadas para habilitar ou desabilitar o modo DEBUG e o modo SCHEDULER_EXEC, respectivamente as MACROS SET_DEBUG e SCHEDULER_EXEC. O Modo DEBUG imprime no terminal muitas informações usadas para fazer debug do programa. O modo SCHEDULER_EXEC imprime informações completas sobre a execução do escalonador. Por default, a definição das macros SET_DEBUG e SCHEDULER_EXEC estão comentadas em globalsettings.h. Logo, o programa imprime apenas erros, as saídas dos processos usuários e o mínimo de informação sobre o escalonador necessário para a compreensão da simulação. 
+
+OBS2: O programa usuário aguarda um sinal SIGUSR2 do escalonador para saber que o sinal de I/O foi recebido pelo escalonador. Isso evita que o processo usuário comece a executar uma nova rajada de CPU devido a um pequeno atraso da recepção do sinal de I/O (SIGUSR1) pelo processo escalonador (scheduler).
+
+IMPORTANTE: quando o tempo restante para o término de uma rajada é igual ao tempo de quantum da fila atual, muitas vezes o escalonador interrompe o processo usuário antes da chamada kil(schedulerPid, SIGUSR1), logo o processo é reinserido em uma fila de menor prioridade. Porém, essa fila será ainda percorrida pelo escalonador. Quando o escalonador escalonar esse processo, o sinal I/O é enviado para o escalonador, devidamente recebido e o processo é reinserido, após 3 segundos, na fila de prioridade logo acima (um nível de prioridade acima), sendo posicionado na fila de onde não deveria ter saído. Isso foi solucionado usando a variável flag waitSignal e o envio de sinal SIGUSR2 do programa usuário para o processo escalonador.
+
+TESTES  
+
+	Sempre que um processo excede o tempo de execução do quantum da fila de prioridade atual, ele deve ser transferido para uma fila de prioridade mais baixa (imediatamente abaixo). Sempre que o processo não excede o tempo de execução do quantum da fila de prioridade atual, ele deve ser transferido para uma fila de prioridade mais alta (imeadiatamente acima).
+
+	F1 => Prioridade Máxima
+	F2 => Prioridade Média
+	F3 => Prioridade Mínima
+
+*******************************************************
+
+TESTE 1: exec program (0)
+
+./interpreter scheduler 9999
+
+======== Command Interpreter ========
+
+Initializing...
+
+Enter command: exec program (0)
+
+Enter command: 
+About to execute scheduled process <PID 13487> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 20:53:55 2017
+
+
+	Current Time: Sun Oct 29 20:53:55 2017
+
+
+	Process PID 13487 reaped and removed from the priority queues.
+
+Conforme esperado, logo após o processo ser inserido na fila F1 do escalonador e executado (escalonado), esse processo usuário envia um sinal SIGCHLD para o escalonador que remove o processo das filas de prioridade e o processo é terminado.
+
+
+TESTE 2: exec program (0, 0, 0)
+
+./interpreter scheduler 9999
+
+======== Command Interpreter ========
+
+Initializing...
+
+Enter command: exec program (0, 0, 0)
+
+Enter command: 
+About to execute scheduled process <PID 13504> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 20:56:47 2017
+
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 20:56:47 2017
+
+
+Reinserting process <PID 13504> in Priority Queue F1!
+	Current Time: Sun Oct 29 20:56:50 2017
+
+
+About to execute scheduled process <PID 13504> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 20:56:50 2017
+
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 20:56:50 2017
+
+
+Reinserting process <PID 13504> in Priority Queue F1!
+	Current Time: Sun Oct 29 20:56:53 2017
+
+
+About to execute scheduled process <PID 13504> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 20:56:53 2017
+
+
+	Current Time: Sun Oct 29 20:56:53 2017
+
+
+	Process PID 13504 reaped and removed from the priority queues.
+
+O processo inserido é escalonado e imediatamente o sinal de I/O é emitido para o escalonador que interrompe a execução do processo usuário de PID 13504. Observa-se que o escalonador fica parado até se passarem 3 segundos. O tempo decorrido entre a hora do sinal I/O (inserção do processo na quarentena) e a hora da reinserção do processo na fila F1 foi exatamente de 3 segundos, o tempo de bloqueio do processo em quarentena. Como não existe outro processo, o escalonador fica parado esperando novo processo nas filas F1, F2 e F3 para escalonar. Quando o processo é reinserido na fila F1, o escalonador escalona o processo imediatamente (verifique o tempo de escalonamento). E ele repete o mesmo comportamento dado que nenhum outro programa usuário é executado nesse teste e que todas as rajadas desse programa usuário é de 0 segundos. O processo sempre é reinserido na fila F1 porque ele nunca excede o tempo de quantum da fila F1 (1 segundo). Logo, o resultado está de acordo com o esperado.
+
+*******************************************************
+ 
+TESTE 3 (leitura de comandos do arquivo teste00)
+
+-------------------------------------------------------
+
+teste00
+
+exec program (1, 1, 1)
+
+
+-------------------------------------------------------
+
+Execução:
+
+./interpreter scheduler 9999 teste00
+
+======== Command Interpreter ========
+
+Initializing...
+
+Enter command: 
+About to execute scheduled process <PID 14597> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:25:43 2017
+
+14597
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 21:25:44 2017
+
+
+Reinserting process <PID 14597> in Priority Queue F1!
+	Current Time: Sun Oct 29 21:25:47 2017
+
+
+About to execute scheduled process <PID 14597> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:25:47 2017
+
+14597
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 21:25:48 2017
+
+
+Reinserting process <PID 14597> in Priority Queue F1!
+	Current Time: Sun Oct 29 21:25:51 2017
+
+
+About to execute scheduled process <PID 14597> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:25:51 2017
+
+14597
+
+	Current Time: Sun Oct 29 21:25:52 2017
+
+
+	Process PID 14597 reaped and removed from the priority queues.
+
+Esse teste tem um comando muito semelhante ao comando do teste anterior (exec program (0, 0, 0)). Porém, dessa vez cada rajada tem duração de 1 segundo. Consequentemente, dado que o processo começa na fila F1 de quantum de 1 segundo　e todas as rajadas são de 1 segundo, o processo não excede o quantum da fila quando escalonado. Portanto, o processo permanece sempre na fila F1 quando não está na fila de quarentena. Quando ocorre I/O, o processo é inserido na quarentena e volta para a fila F1 após exatamente 3 segundos, conforme esperado. Assim, o processo é escalonado 3 vezes na fila F1 e termina a execução enviando um sinal SIGCHLD para o processo escalonador que elimina o processo do sistema.
+
+*******************************************************
+ 
+TESTE 4 (leitura de comandos do arquivo teste01)
+
+-------------------------------------------------------
+
+teste01
+
+exec program (2, 2)
+exec program (1, 1)
+
+-------------------------------------------------------
+
+Execução:
+
+./interpreter scheduler 9999 teste01
+
+======== Command Interpreter ========
+
+Initializing...
+
+Enter command: 
+About to execute scheduled process <PID 15076> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:43:16 2017
+
+15076
+
+	Current Time: Sun Oct 29 21:43:17 2017
+
+
+About to execute scheduled process <PID 15076> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 21:43:17 2017
+
+15076
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 21:43:18 2017
+
+
+About to execute scheduled process <PID 15079> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:43:18 2017
+
+15079
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 21:43:19 2017
+
+
+Reinserting process <PID 15076> in Priority Queue F1!
+	Current Time: Sun Oct 29 21:43:21 2017
+
+
+About to execute scheduled process <PID 15076> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:43:21 2017
+
+15076
+
+	Current Time: Sun Oct 29 21:43:22 2017
+
+
+Reinserting process <PID 15079> in Priority Queue F1!
+	Current Time: Sun Oct 29 21:43:22 2017
+
+
+About to execute scheduled process <PID 15076> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 21:43:22 2017
+
+15076
+
+	Current Time: Sun Oct 29 21:43:23 2017
+
+
+	Process PID 15076 reaped and removed from the priority queues.
+
+About to execute scheduled process <PID 15079> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 21:43:23 2017
+
+15079
+
+	Current Time: Sun Oct 29 21:43:24 2017
+
+
+About to execute scheduled process <PID 15079> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 21:43:24 2017
+
+
+	Current Time: Sun Oct 29 21:43:24 2017
+
+
+	Process PID 15079 reaped and removed from the priority queues.
+
+O processo de rajadas (2, 2) é o primeiro a ser inserido na fila F1. O escalonador verifica que a fila F1 tem um processo e escalona esse processo em quantum de 1 segundo. A rajada do processo é de 2 segundos, então ao fim do 1 segundo de quantum, o processo é interrompido pelo escalonador. A rajada do processo excedeu o quantum da fila F1. Por isso, o processo é removido da fila F1 e inserido na fila F2. O outro processo de rajadas (1, 1) está na fila F1 aguardando ser executado. Porém ele foi inserido depois do escalonador começar a escalonar, então antes do escalonador escalonar o processo da fila F1, ele vai verificar as filas F2 e F3. Na fila F2 ele encontra o processo (2, 2) e executa em um quantum de 2 segundos. Dado que só falta 1 segundo para ocorrer I/O nesse processo e o quantum dura 2 segundos, o processo é interrompido pelo escalonador após o escalonador receber o sinal de I/O. Podemos verificar que embora o quantum dessa fila seja de 2 segundos, apenas 1 segundo decorreu entre o início do escalonamento desse processo e o fim do escalonamento desse processo. Como o processo foi interrompido antes do I/O, ele é inserido na quarentena onde fica por 3 segundos (3 segundos são decorridos entre o momento em que ele é colocado na quarentena e o momento em que ele é reinserido na fila F1). Ao fim da quarentena, ele é inserido na fila F1 porque ele não excedeu o quantum da fila F2. O escalonador verifica que a fila F3 está vazia e escalona o processo da fila F1, o processo (1, 1). No quantum de 1 segundo, esse processo é interrompido por I/O e vai para quarentena. Enquanto isso, o processo (2, 2) tendo retornado a fila F1, é escalonado excedendo o quantum de 1 segundo novamente e sendo transferido para a fila F2. Na fila F2, ele é escalonado e a sua execução termina. O processo envia SIGCHLD para o escalonador que o elimina do sistema. O processo (1, 1) tendo retornado para a fila F1, é escalonado e a sua execução também termina, o pai recebe o sinal SIGCHLD e esse processo é eliminado do sistema. Fim do teste.
+
+*******************************************************
+ 
+TESTE 5 (leitura de comandos do arquivo teste02)
+
+-------------------------------------------------------
+
+teste02
+
+exec program (2, 2)
+exec program (1, 1)
+exec program (1)
+
+-------------------------------------------------------
+
+Execução:
+
+./interpreter scheduler 9999 teste02
+
+======== Command Interpreter ========
+
+Initializing...
+
+Enter command: 
+About to execute scheduled process <PID 15378> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 22:02:20 2017
+
+15378
+
+	Current Time: Sun Oct 29 22:02:21 2017
+
+
+About to execute scheduled process <PID 15378> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 22:02:21 2017
+
+15378
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 22:02:22 2017
+
+
+About to execute scheduled process <PID 15379> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 22:02:22 2017
+
+15379
+
+	I/O signal (w4IOHandler received!)
+
+	Current Time: Sun Oct 29 22:02:23 2017
+
+
+About to execute scheduled process <PID 15380> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 22:02:23 2017
+
+15380
+
+	Current Time: Sun Oct 29 22:02:24 2017
+
+
+About to execute scheduled process <PID 15380> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 22:02:24 2017
+
+
+	Current Time: Sun Oct 29 22:02:24 2017
+
+
+	Process PID 15380 reaped and removed from the priority queues.
+
+Reinserting process <PID 15378> in Priority Queue F1!
+	Current Time: Sun Oct 29 22:02:25 2017
+
+
+About to execute scheduled process <PID 15378> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 22:02:25 2017
+
+15378
+
+	Current Time: Sun Oct 29 22:02:26 2017
+
+
+Reinserting process <PID 15379> in Priority Queue F1!
+	Current Time: Sun Oct 29 22:02:26 2017
+
+
+About to execute scheduled process <PID 15378> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 22:02:26 2017
+
+15378
+
+	Current Time: Sun Oct 29 22:02:27 2017
+
+
+	Process PID 15378 reaped and removed from the priority queues.
+
+About to execute scheduled process <PID 15379> from Priority Queue F1!
+
+	Current Time: Sun Oct 29 22:02:27 2017
+
+15379
+
+	Current Time: Sun Oct 29 22:02:28 2017
+
+
+About to execute scheduled process <PID 15379> from Priority Queue F2!
+
+	Current Time: Sun Oct 29 22:02:28 2017
+
+
+	Current Time: Sun Oct 29 22:02:28 2017
+
+
+	Process PID 15379 reaped and removed from the priority queues.
+
+O resultado é muito semelhante com o resultado do teste anterior. Porém, dessa vez há um terceiro
+processo com uma única rajada de 1 segundo. Esse processo tem PID 15380 e é escalonado uma vez e a
+sua execução termina. De resto (os outros processos usuário), o escalonamento segue a mesma lógica
+e ordem descritas no teste anterior.
+
+*******************************************************
+

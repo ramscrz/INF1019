@@ -1,0 +1,1291 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois 
+processos: processo pai e processo filho. 
+
+	Pai: Imprime “Processo pai iniciado”, o seu pid e
+	o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado". 
+	Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar 
+	imprime "Processo filho finalizado".
+
+DICA: Busque na internet o comando utilizado para obter o PID (process id) de um processo.
+
+-----------------------------------------------------
+
+ex01.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+   int status = 0;
+   pid_t parentpid = getpid();
+
+   pid_t pid = fork();
+
+   if(pid != 0) {
+      // Parent
+      printf("\nProcesso pai inicializado...\n");
+      printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+
+      // Parent process waits for the child process to return before resuming execution.
+      waitpid(pid, &status, 0);
+      printf("Processo pai finalizado!\n\n");
+      exit(0);
+   } else {
+      // Child
+      printf("\tProcesso filho inicializado...\n");
+      printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+      printf("\tProcesso filho finalizado!\n\n");
+      exit(0);
+   }
+
+   return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc ex01.c -o ex01
+$ ./ex01
+
+-----------------------------------------------------
+
+RESULTADO
+
+Processo pai inicializado...
+pid: 8239 	 pid(child): 8240
+
+	Processo filho inicializado...
+	pid: 8240 	 pid(parent): 8239
+	Processo filho finalizado!
+
+Processo pai finalizado!
+
+-----------------------------------------------------
+
+QUESTÃO 2) Ainda com um programa composto por dois processos, crie uma variável visível ao pai e ao filho
+iniciada com o valor zero. 
+	O pai deve executar um loop de 100 vezes, somar 5 a esta variável a cada iteração do loop e 
+	imprimir o texto: *Pai <PID> - <valor da variável>*. 
+	O filho deve executar um loop de 100 vezes, somar 10 a esta variável a cada iteração do loop e 
+	imprimir o texto: *Filho <PID> - <valor da variável>*. 
+
+a) O que você observou sobre o valor da variável no pai e no filho?
+
+b) O que você observou sobre a concorrência entre os processos?
+
+c) Explique o por quê destes comportamentos.
+
+DICA: Para saber os protótipos das funções fork e waitpid execute o comando “man” no Terminal para
+acessar o manual: "man fork" e "man waitpid".
+
+-----------------------------------------------------
+
+ex02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+   int i, status = 0;
+   int value = 0;
+   pid_t parentpid = getpid();
+
+   pid_t pid = fork();
+
+   if(pid != 0) {
+      //Parent
+      printf("\nProcesso pai inicializado...\n");
+      printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+
+      // Parent process waits for the child process to return before resuming execution.
+      waitpid(pid, &status, 0);
+
+      for(i = 0; i < 100; i++) {
+         value += 5;
+         printf("*Pai <%d> - <%d>\n", parentpid, value);
+      }
+
+      printf("Processo pai finalizado!\n\n");
+      exit(0);
+   } else {
+      // Child
+      printf("\tProcesso filho inicializado...\n");
+      printf("\tpid: %d \t pid(parent): %d\n\n", getpid(), parentpid);
+
+      for(i = 0; i < 100; i++) {
+         value += 10;
+         printf("\t*Filho <%d> - <%d>\n", getpid(), value);
+      }
+
+      printf("\tProcesso filho finalizado!\n\n");
+      exit(0);
+   }
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc ex02.c -o ex02
+$ ./ex02
+
+-----------------------------------------------------
+
+RESULTADO
+
+Processo pai inicializado...
+pid: 8321 	 pid(child): 8322
+
+	Processo filho inicializado...
+	pid: 8322 	 pid(parent): 8321
+
+	*Filho <8322> - <10>
+	*Filho <8322> - <20>
+	*Filho <8322> - <30>
+	*Filho <8322> - <40>
+	*Filho <8322> - <50>
+	*Filho <8322> - <60>
+	*Filho <8322> - <70>
+	*Filho <8322> - <80>
+	*Filho <8322> - <90>
+	*Filho <8322> - <100>
+	*Filho <8322> - <110>
+	*Filho <8322> - <120>
+	*Filho <8322> - <130>
+	*Filho <8322> - <140>
+	*Filho <8322> - <150>
+	*Filho <8322> - <160>
+	*Filho <8322> - <170>
+	*Filho <8322> - <180>
+	*Filho <8322> - <190>
+	*Filho <8322> - <200>
+	*Filho <8322> - <210>
+	*Filho <8322> - <220>
+	*Filho <8322> - <230>
+	*Filho <8322> - <240>
+	*Filho <8322> - <250>
+	*Filho <8322> - <260>
+	*Filho <8322> - <270>
+	*Filho <8322> - <280>
+	*Filho <8322> - <290>
+	*Filho <8322> - <300>
+	*Filho <8322> - <310>
+	*Filho <8322> - <320>
+	*Filho <8322> - <330>
+	*Filho <8322> - <340>
+	*Filho <8322> - <350>
+	*Filho <8322> - <360>
+	*Filho <8322> - <370>
+	*Filho <8322> - <380>
+	*Filho <8322> - <390>
+	*Filho <8322> - <400>
+	*Filho <8322> - <410>
+	*Filho <8322> - <420>
+	*Filho <8322> - <430>
+	*Filho <8322> - <440>
+	*Filho <8322> - <450>
+	*Filho <8322> - <460>
+	*Filho <8322> - <470>
+	*Filho <8322> - <480>
+	*Filho <8322> - <490>
+	*Filho <8322> - <500>
+	*Filho <8322> - <510>
+	*Filho <8322> - <520>
+	*Filho <8322> - <530>
+	*Filho <8322> - <540>
+	*Filho <8322> - <550>
+	*Filho <8322> - <560>
+	*Filho <8322> - <570>
+	*Filho <8322> - <580>
+	*Filho <8322> - <590>
+	*Filho <8322> - <600>
+	*Filho <8322> - <610>
+	*Filho <8322> - <620>
+	*Filho <8322> - <630>
+	*Filho <8322> - <640>
+	*Filho <8322> - <650>
+	*Filho <8322> - <660>
+	*Filho <8322> - <670>
+	*Filho <8322> - <680>
+	*Filho <8322> - <690>
+	*Filho <8322> - <700>
+	*Filho <8322> - <710>
+	*Filho <8322> - <720>
+	*Filho <8322> - <730>
+	*Filho <8322> - <740>
+	*Filho <8322> - <750>
+	*Filho <8322> - <760>
+	*Filho <8322> - <770>
+	*Filho <8322> - <780>
+	*Filho <8322> - <790>
+	*Filho <8322> - <800>
+	*Filho <8322> - <810>
+	*Filho <8322> - <820>
+	*Filho <8322> - <830>
+	*Filho <8322> - <840>
+	*Filho <8322> - <850>
+	*Filho <8322> - <860>
+	*Filho <8322> - <870>
+	*Filho <8322> - <880>
+	*Filho <8322> - <890>
+	*Filho <8322> - <900>
+	*Filho <8322> - <910>
+	*Filho <8322> - <920>
+	*Filho <8322> - <930>
+	*Filho <8322> - <940>
+	*Filho <8322> - <950>
+	*Filho <8322> - <960>
+	*Filho <8322> - <970>
+	*Filho <8322> - <980>
+	*Filho <8322> - <990>
+	*Filho <8322> - <1000>
+	Processo filho finalizado!
+
+*Pai <8321> - <5>
+*Pai <8321> - <10>
+*Pai <8321> - <15>
+*Pai <8321> - <20>
+*Pai <8321> - <25>
+*Pai <8321> - <30>
+*Pai <8321> - <35>
+*Pai <8321> - <40>
+*Pai <8321> - <45>
+*Pai <8321> - <50>
+*Pai <8321> - <55>
+*Pai <8321> - <60>
+*Pai <8321> - <65>
+*Pai <8321> - <70>
+*Pai <8321> - <75>
+*Pai <8321> - <80>
+*Pai <8321> - <85>
+*Pai <8321> - <90>
+*Pai <8321> - <95>
+*Pai <8321> - <100>
+*Pai <8321> - <105>
+*Pai <8321> - <110>
+*Pai <8321> - <115>
+*Pai <8321> - <120>
+*Pai <8321> - <125>
+*Pai <8321> - <130>
+*Pai <8321> - <135>
+*Pai <8321> - <140>
+*Pai <8321> - <145>
+*Pai <8321> - <150>
+*Pai <8321> - <155>
+*Pai <8321> - <160>
+*Pai <8321> - <165>
+*Pai <8321> - <170>
+*Pai <8321> - <175>
+*Pai <8321> - <180>
+*Pai <8321> - <185>
+*Pai <8321> - <190>
+*Pai <8321> - <195>
+*Pai <8321> - <200>
+*Pai <8321> - <205>
+*Pai <8321> - <210>
+*Pai <8321> - <215>
+*Pai <8321> - <220>
+*Pai <8321> - <225>
+*Pai <8321> - <230>
+*Pai <8321> - <235>
+*Pai <8321> - <240>
+*Pai <8321> - <245>
+*Pai <8321> - <250>
+*Pai <8321> - <255>
+*Pai <8321> - <260>
+*Pai <8321> - <265>
+*Pai <8321> - <270>
+*Pai <8321> - <275>
+*Pai <8321> - <280>
+*Pai <8321> - <285>
+*Pai <8321> - <290>
+*Pai <8321> - <295>
+*Pai <8321> - <300>
+*Pai <8321> - <305>
+*Pai <8321> - <310>
+*Pai <8321> - <315>
+*Pai <8321> - <320>
+*Pai <8321> - <325>
+*Pai <8321> - <330>
+*Pai <8321> - <335>
+*Pai <8321> - <340>
+*Pai <8321> - <345>
+*Pai <8321> - <350>
+*Pai <8321> - <355>
+*Pai <8321> - <360>
+*Pai <8321> - <365>
+*Pai <8321> - <370>
+*Pai <8321> - <375>
+*Pai <8321> - <380>
+*Pai <8321> - <385>
+*Pai <8321> - <390>
+*Pai <8321> - <395>
+*Pai <8321> - <400>
+*Pai <8321> - <405>
+*Pai <8321> - <410>
+*Pai <8321> - <415>
+*Pai <8321> - <420>
+*Pai <8321> - <425>
+*Pai <8321> - <430>
+*Pai <8321> - <435>
+*Pai <8321> - <440>
+*Pai <8321> - <445>
+*Pai <8321> - <450>
+*Pai <8321> - <455>
+*Pai <8321> - <460>
+*Pai <8321> - <465>
+*Pai <8321> - <470>
+*Pai <8321> - <475>
+*Pai <8321> - <480>
+*Pai <8321> - <485>
+*Pai <8321> - <490>
+*Pai <8321> - <495>
+*Pai <8321> - <500>
+Processo pai finalizado!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+a) O que você observou sobre o valor da variável no pai e no filho? 
+
+A variável possui um valor independente para os processos pai e filho. O espaço de memória para cada processo. Portanto, cada processo consegue alterar e utilizar a variável independentemente.
+Porém, no momento de criação do processo filho, o valor da variável no pai é mantido como valor da mesma variável no processo filho.
+
+b) O que você observou sobre a concorrência entre os processos? 
+
+Os processos pai e filho são executados por partes tal que o sistema operacional executa partes dos processos intercaladas, podendo executar mais de uma parte de um mesmo processo consecutivamente.
+Portanto, ocorre a execução de partes dos processos alternadamente (caso o waitpid não seja 
+utilizado) até que os processos terminem de ser executados, mantendo uma área de dados independente e
+separada para cada processo. Isso causa a sensação de execução paralela.
+
+c) Explique o por quê destes comportamentos. 
+
+A variável possui um espaço de memória para cada processo. Portanto, cada processo consegue alterar e utilizar a variável independentemente.
+Porém, no momento de criação do processo filho, o valor da variável no processo filho é igual 
+ao valor da mesma variável no processo pai até esse momento.
+
+-----------------------------------------------------
+
+QUESTÃO 3) Faça um programa em que três processos executam em paralelo as seguintes ações: 
+	Pai: Imprime os números de 0 a 99, com um intervalo de 1 segundo entre a impressão de cada número. 
+	Após imprimir todos os números, imprime a frase “Processo pai vai finalizar” e finaliza quando 
+	o filho terminar. 
+	Filho: Imprime os números de 100 a 199, com um intervalo de 2 segundo entre a impressão cada 
+	número. 
+	Antes de imprimir os números, imprime a frase “Filho foi criado”. Após imprimir todos os números, 
+	imprime a frase “processo filho vai finalizar” e finaliza quando o neto terminar. 
+	Neto: filho do processo Filho (ou seja, neto do processo Pai). Imprime os números de 200 a 299, 
+	com um intervalo de 3 segundos entre cada número. Antes de imprimir os números, imprime a frase 
+	“Neto foi criado”. Após imprimir todos os números, imprime a frase “processo neto vai finalizar”
+	e finaliza o processo.
+	Importante: Em cada printf os processos devem imprimir o seu pid e o pid do seu pai. 
+
+	DICA:A chamada ao sistema sleep(1) bloqueia o processo por 1 segundo.
+
+	a) É possível observar os processos executando em paralelo?
+
+	b) Que alterações devem ser feitas em seu programa para que primeiro sejam exibidas as 
+	impressões do neto, depois do filho e depois do pai?
+
+-----------------------------------------------------
+
+ex03.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+        int i, status = 0;
+        pid_t parentpid = getpid();
+        pid_t pidGrandparent = 0;
+        pid_t pid = fork();
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+
+                for(i = 0; i < 100; i++) {
+                    printf("\nPai <pid: %d> - <pid(parent): - > <value: %d>", parentpid, i);
+                    sleep(1);
+                }
+
+                printf("Processo pai vai finalizar\n\n");
+                waitpid(pid, &status, 0);
+                exit(0);
+        } else {
+                // Child
+                printf("\tFilho foi criado\n");
+                printf("\tpid: %d \t pid(parent): %d\n\n", getpid(), parentpid);
+                pidGrandparent = parentpid;
+                parentpid = getpid();
+                pid = fork();
+
+                if(pid != 0) {
+                    // Child Parent
+                    for(i = 100; i < 200; i++) {
+                        printf("\n\tFilho <pid: %d> - <pid(parent): %d> <value: %d>",
+                        getpid(), pidGrandparent, i);
+                        sleep(2);
+                    }
+                    printf("\tProcesso fiho vai finalizar\n\n");
+                    waitpid(pid, &status, 0);
+                    exit(0);
+                } else {
+                    // Neto
+                    printf("\t\tNeto foi criado\n");
+                    printf("\t\tpid: %d \t pid(parent): %d \t pid(grandparent): %d\n\n",
+                    getpid(), parentpid, pidGrandparent);
+
+                    for(i = 200; i < 300; i++) {
+                        printf("\n\t\tNeto <pid: %d> - <pid(parent): %d> <value: %d>", getpid(), 
+												parentpid, i);
+                        sleep(3);
+                    }
+
+                    printf("\t\tProcesso neto vai finalizar\n\n");
+                    exit(0);
+
+                }
+			}
+
+        	return 0;
+}
+
+
+ex03_02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+        int i, status = 0;
+        pid_t parentpid = getpid();
+        pid_t pidGrandparent = 0;
+        pid_t pid = fork();
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+
+                waitpid(pid, &status, 0);
+                for(i = 0; i < 100; i++) {
+                    printf("\nPai <pid: %d> - <pid(parent): - > <value: %d>", parentpid, i);
+                    sleep(1);
+                }
+
+                printf("Processo pai vai finalizar\n\n");
+                exit(0);
+        } else {
+                // Child
+                printf("\tFilho foi criado\n");
+                printf("\tpid: %d \t pid(parent): %d\n\n", getpid(), parentpid);
+                pidGrandparent = parentpid;
+                parentpid = getpid();
+                pid = fork();
+
+                if(pid != 0) {
+                    // Child Parent
+                    waitpid(pid, &status, 0);
+                    for(i = 100; i < 200; i++) {
+                        printf("\n\tFilho <pid: %d> - <pid(parent): %d> <value: %d>",
+                        getpid(), pidGrandparent, i);
+                        sleep(2);
+                    }
+                    printf("\tProcesso fiho vai finalizar\n\n");
+                    exit(0);
+                } else {
+                    // Neto
+                    printf("\t\tNeto foi criado\n");
+                    printf("\t\tpid: %d \t pid(parent): %d \t pid(grandparent): %d\n\n",
+                    getpid(), parentpid, pidGrandparent);
+
+                    for(i = 200; i < 300; i++) {
+                        printf("\n\t\tNeto <pid: %d> - <pid(parent): %d> <value: %d>", getpid(), 
+												parentpid, i);
+                        sleep(3);
+                    }
+
+                    printf("\t\tProcesso neto vai finalizar\n\n");
+                    exit(0);
+
+                }
+        }
+
+        return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc ex03.c -o ex03
+$ ./ex03
+$ gcc ex03_02.c -o ex03_02
+$ ./ex03_02
+
+-----------------------------------------------------
+
+RESULTADO
+
+./ex03
+
+Processo pai inicializado...
+pid: 8068 	 pid(child): 8069
+
+
+	Filho foi criado
+	pid: 8069 	 pid(parent): 8068
+
+
+		Neto foi criado
+		pid: 8070 	 pid(parent): 8069 	 pid(grandparent): 8068
+
+
+Pai <pid: 8068> - <pid(parent): - > <value: 0>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 100>
+Pai <pid: 8068> - <pid(parent): - > <value: 1>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 200>
+Pai <pid: 8068> - <pid(parent): - > <value: 2>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 101>
+Pai <pid: 8068> - <pid(parent): - > <value: 3>
+Pai <pid: 8068> - <pid(parent): - > <value: 4>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 102>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 201>
+Pai <pid: 8068> - <pid(parent): - > <value: 5>
+Pai <pid: 8068> - <pid(parent): - > <value: 6>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 103>
+Pai <pid: 8068> - <pid(parent): - > <value: 7>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 202>
+Pai <pid: 8068> - <pid(parent): - > <value: 8>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 104>
+Pai <pid: 8068> - <pid(parent): - > <value: 9>
+Pai <pid: 8068> - <pid(parent): - > <value: 10>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 203>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 105>
+Pai <pid: 8068> - <pid(parent): - > <value: 11>
+Pai <pid: 8068> - <pid(parent): - > <value: 12>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 106>
+Pai <pid: 8068> - <pid(parent): - > <value: 13>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 204>
+Pai <pid: 8068> - <pid(parent): - > <value: 14>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 107>
+Pai <pid: 8068> - <pid(parent): - > <value: 15>
+Pai <pid: 8068> - <pid(parent): - > <value: 16>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 205>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 108>
+Pai <pid: 8068> - <pid(parent): - > <value: 17>
+Pai <pid: 8068> - <pid(parent): - > <value: 18>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 109>
+Pai <pid: 8068> - <pid(parent): - > <value: 19>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 206>
+Pai <pid: 8068> - <pid(parent): - > <value: 20>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 110>
+Pai <pid: 8068> - <pid(parent): - > <value: 21>
+Pai <pid: 8068> - <pid(parent): - > <value: 22>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 207>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 111>
+Pai <pid: 8068> - <pid(parent): - > <value: 23>
+Pai <pid: 8068> - <pid(parent): - > <value: 24>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 112>
+Pai <pid: 8068> - <pid(parent): - > <value: 25>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 208>
+Pai <pid: 8068> - <pid(parent): - > <value: 26>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 113>
+Pai <pid: 8068> - <pid(parent): - > <value: 27>
+Pai <pid: 8068> - <pid(parent): - > <value: 28>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 209>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 114>
+Pai <pid: 8068> - <pid(parent): - > <value: 29>
+Pai <pid: 8068> - <pid(parent): - > <value: 30>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 115>
+Pai <pid: 8068> - <pid(parent): - > <value: 31>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 210>
+Pai <pid: 8068> - <pid(parent): - > <value: 32>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 116>
+Pai <pid: 8068> - <pid(parent): - > <value: 33>
+Pai <pid: 8068> - <pid(parent): - > <value: 34>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 211>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 117>
+Pai <pid: 8068> - <pid(parent): - > <value: 35>
+Pai <pid: 8068> - <pid(parent): - > <value: 36>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 118>
+Pai <pid: 8068> - <pid(parent): - > <value: 37>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 212>
+Pai <pid: 8068> - <pid(parent): - > <value: 38>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 119>
+Pai <pid: 8068> - <pid(parent): - > <value: 39>
+Pai <pid: 8068> - <pid(parent): - > <value: 40>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 213>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 120>
+Pai <pid: 8068> - <pid(parent): - > <value: 41>
+Pai <pid: 8068> - <pid(parent): - > <value: 42>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 121>
+Pai <pid: 8068> - <pid(parent): - > <value: 43>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 214>
+Pai <pid: 8068> - <pid(parent): - > <value: 44>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 122>
+Pai <pid: 8068> - <pid(parent): - > <value: 45>
+Pai <pid: 8068> - <pid(parent): - > <value: 46>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 215>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 123>
+Pai <pid: 8068> - <pid(parent): - > <value: 47>
+Pai <pid: 8068> - <pid(parent): - > <value: 48>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 124>
+Pai <pid: 8068> - <pid(parent): - > <value: 49>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 216>
+Pai <pid: 8068> - <pid(parent): - > <value: 50>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 125>
+Pai <pid: 8068> - <pid(parent): - > <value: 51>
+Pai <pid: 8068> - <pid(parent): - > <value: 52>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 217>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 126>
+Pai <pid: 8068> - <pid(parent): - > <value: 53>
+Pai <pid: 8068> - <pid(parent): - > <value: 54>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 127>
+Pai <pid: 8068> - <pid(parent): - > <value: 55>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 218>
+Pai <pid: 8068> - <pid(parent): - > <value: 56>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 128>
+Pai <pid: 8068> - <pid(parent): - > <value: 57>
+Pai <pid: 8068> - <pid(parent): - > <value: 58>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 219>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 129>
+Pai <pid: 8068> - <pid(parent): - > <value: 59>
+Pai <pid: 8068> - <pid(parent): - > <value: 60>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 130>
+Pai <pid: 8068> - <pid(parent): - > <value: 61>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 220>
+Pai <pid: 8068> - <pid(parent): - > <value: 62>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 131>
+Pai <pid: 8068> - <pid(parent): - > <value: 63>
+Pai <pid: 8068> - <pid(parent): - > <value: 64>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 221>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 132>
+Pai <pid: 8068> - <pid(parent): - > <value: 65>
+Pai <pid: 8068> - <pid(parent): - > <value: 66>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 133>
+Pai <pid: 8068> - <pid(parent): - > <value: 67>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 222>
+Pai <pid: 8068> - <pid(parent): - > <value: 68>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 134>
+Pai <pid: 8068> - <pid(parent): - > <value: 69>
+Pai <pid: 8068> - <pid(parent): - > <value: 70>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 223>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 135>
+Pai <pid: 8068> - <pid(parent): - > <value: 71>
+Pai <pid: 8068> - <pid(parent): - > <value: 72>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 136>
+Pai <pid: 8068> - <pid(parent): - > <value: 73>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 224>
+Pai <pid: 8068> - <pid(parent): - > <value: 74>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 137>
+Pai <pid: 8068> - <pid(parent): - > <value: 75>
+Pai <pid: 8068> - <pid(parent): - > <value: 76>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 225>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 138>
+Pai <pid: 8068> - <pid(parent): - > <value: 77>
+Pai <pid: 8068> - <pid(parent): - > <value: 78>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 139>
+Pai <pid: 8068> - <pid(parent): - > <value: 79>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 226>
+Pai <pid: 8068> - <pid(parent): - > <value: 80>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 140>
+Pai <pid: 8068> - <pid(parent): - > <value: 81>
+Pai <pid: 8068> - <pid(parent): - > <value: 82>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 227>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 141>
+Pai <pid: 8068> - <pid(parent): - > <value: 83>
+Pai <pid: 8068> - <pid(parent): - > <value: 84>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 142>
+Pai <pid: 8068> - <pid(parent): - > <value: 85>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 228>
+Pai <pid: 8068> - <pid(parent): - > <value: 86>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 143>
+Pai <pid: 8068> - <pid(parent): - > <value: 87>
+Pai <pid: 8068> - <pid(parent): - > <value: 88>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 229>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 144>
+Pai <pid: 8068> - <pid(parent): - > <value: 89>
+Pai <pid: 8068> - <pid(parent): - > <value: 90>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 145>
+Pai <pid: 8068> - <pid(parent): - > <value: 91>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 230>
+Pai <pid: 8068> - <pid(parent): - > <value: 92>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 146>
+Pai <pid: 8068> - <pid(parent): - > <value: 93>
+Pai <pid: 8068> - <pid(parent): - > <value: 94>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 231>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 147>
+Pai <pid: 8068> - <pid(parent): - > <value: 95>
+Pai <pid: 8068> - <pid(parent): - > <value: 96>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 148>
+Pai <pid: 8068> - <pid(parent): - > <value: 97>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 232>
+Pai <pid: 8068> - <pid(parent): - > <value: 98>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 149>
+Pai <pid: 8068> - <pid(parent): - > <value: 99>Processo pai vai finalizar
+
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 233>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 150>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 151>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 234>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 152>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 235>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 153>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 154>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 236>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 155>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 237>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 156>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 157>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 238>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 158>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 239>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 159>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 160>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 240>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 161>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 241>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 162>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 163>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 242>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 164>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 243>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 165>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 166>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 244>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 167>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 245>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 168>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 169>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 246>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 170>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 247>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 171>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 172>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 248>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 173>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 249>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 174>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 175>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 250>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 176>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 251>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 177>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 178>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 252>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 179>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 253>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 180>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 181>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 254>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 182>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 255>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 183>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 184>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 256>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 185>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 257>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 186>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 187>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 258>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 188>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 259>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 189>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 190>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 260>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 191>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 261>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 192>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 193>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 262>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 194>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 263>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 195>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 196>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 264>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 197>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 265>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 198>
+	Filho <pid: 8069> - <pid(parent): 8068> <value: 199>	Processo fiho vai finalizar
+
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 266>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 267>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 268>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 269>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 270>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 271>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 272>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 273>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 274>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 275>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 276>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 277>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 278>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 279>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 280>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 281>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 282>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 283>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 284>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 285>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 286>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 287>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 288>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 289>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 290>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 291>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 292>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 293>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 294>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 295>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 296>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 297>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 298>
+		Neto <pid: 8070> - <pid(parent): 8069> <value: 299>		Processo neto vai finalizar
+
+
+
+
+./ex03_02
+
+
+Processo pai inicializado...
+pid: 7839 	 pid(child): 7840
+
+	Filho foi criado
+	pid: 7840 	 pid(parent): 7839
+
+		Neto foi criado
+		pid: 7841 	 pid(parent): 7840 	 pid(grandparent): 7839
+
+
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 200>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 201>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 202>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 203>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 204>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 205>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 206>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 207>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 208>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 209>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 210>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 211>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 212>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 213>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 214>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 215>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 216>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 217>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 218>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 219>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 220>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 221>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 222>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 223>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 224>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 225>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 226>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 227>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 228>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 229>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 230>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 231>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 232>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 233>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 234>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 235>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 236>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 237>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 238>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 239>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 240>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 241>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 242>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 243>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 244>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 245>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 246>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 247>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 248>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 249>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 250>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 251>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 252>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 253>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 254>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 255>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 256>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 257>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 258>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 259>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 260>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 261>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 262>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 263>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 264>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 265>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 266>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 267>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 268>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 269>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 270>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 271>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 272>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 273>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 274>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 275>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 276>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 277>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 278>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 279>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 280>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 281>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 282>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 283>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 284>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 285>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 286>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 287>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 288>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 289>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 290>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 291>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 292>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 293>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 294>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 295>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 296>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 297>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 298>
+		Neto <pid: 7841> - <pid(parent): 7840> <value: 299>		Processo neto vai finalizar
+
+
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 100>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 101>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 102>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 103>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 104>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 105>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 106>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 107>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 108>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 109>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 110>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 111>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 112>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 113>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 114>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 115>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 116>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 117>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 118>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 119>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 120>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 121>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 122>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 123>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 124>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 125>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 126>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 127>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 128>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 129>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 130>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 131>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 132>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 133>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 134>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 135>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 136>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 137>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 138>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 139>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 140>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 141>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 142>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 143>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 144>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 145>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 146>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 147>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 148>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 149>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 150>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 151>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 152>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 153>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 154>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 155>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 156>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 157>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 158>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 159>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 160>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 161>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 162>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 163>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 164>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 165>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 166>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 167>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 168>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 169>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 170>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 171>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 172>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 173>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 174>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 175>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 176>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 177>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 178>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 179>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 180>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 181>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 182>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 183>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 184>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 185>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 186>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 187>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 188>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 189>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 190>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 191>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 192>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 193>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 194>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 195>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 196>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 197>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 198>
+	Filho <pid: 7840> - <pid(parent): 7839> <value: 199>	Processo fiho vai finalizar
+
+
+Pai <pid: 7839> - <pid(parent): - > <value: 0>
+Pai <pid: 7839> - <pid(parent): - > <value: 1>
+Pai <pid: 7839> - <pid(parent): - > <value: 2>
+Pai <pid: 7839> - <pid(parent): - > <value: 3>
+Pai <pid: 7839> - <pid(parent): - > <value: 4>
+Pai <pid: 7839> - <pid(parent): - > <value: 5>
+Pai <pid: 7839> - <pid(parent): - > <value: 6>
+Pai <pid: 7839> - <pid(parent): - > <value: 7>
+Pai <pid: 7839> - <pid(parent): - > <value: 8>
+Pai <pid: 7839> - <pid(parent): - > <value: 9>
+Pai <pid: 7839> - <pid(parent): - > <value: 10>
+Pai <pid: 7839> - <pid(parent): - > <value: 11>
+Pai <pid: 7839> - <pid(parent): - > <value: 12>
+Pai <pid: 7839> - <pid(parent): - > <value: 13>
+Pai <pid: 7839> - <pid(parent): - > <value: 14>
+Pai <pid: 7839> - <pid(parent): - > <value: 15>
+Pai <pid: 7839> - <pid(parent): - > <value: 16>
+Pai <pid: 7839> - <pid(parent): - > <value: 17>
+Pai <pid: 7839> - <pid(parent): - > <value: 18>
+Pai <pid: 7839> - <pid(parent): - > <value: 19>
+Pai <pid: 7839> - <pid(parent): - > <value: 20>
+Pai <pid: 7839> - <pid(parent): - > <value: 21>
+Pai <pid: 7839> - <pid(parent): - > <value: 22>
+Pai <pid: 7839> - <pid(parent): - > <value: 23>
+Pai <pid: 7839> - <pid(parent): - > <value: 24>
+Pai <pid: 7839> - <pid(parent): - > <value: 25>
+Pai <pid: 7839> - <pid(parent): - > <value: 26>
+Pai <pid: 7839> - <pid(parent): - > <value: 27>
+Pai <pid: 7839> - <pid(parent): - > <value: 28>
+Pai <pid: 7839> - <pid(parent): - > <value: 29>
+Pai <pid: 7839> - <pid(parent): - > <value: 30>
+Pai <pid: 7839> - <pid(parent): - > <value: 31>
+Pai <pid: 7839> - <pid(parent): - > <value: 32>
+Pai <pid: 7839> - <pid(parent): - > <value: 33>
+Pai <pid: 7839> - <pid(parent): - > <value: 34>
+Pai <pid: 7839> - <pid(parent): - > <value: 35>
+Pai <pid: 7839> - <pid(parent): - > <value: 36>
+Pai <pid: 7839> - <pid(parent): - > <value: 37>
+Pai <pid: 7839> - <pid(parent): - > <value: 38>
+Pai <pid: 7839> - <pid(parent): - > <value: 39>
+Pai <pid: 7839> - <pid(parent): - > <value: 40>
+Pai <pid: 7839> - <pid(parent): - > <value: 41>
+Pai <pid: 7839> - <pid(parent): - > <value: 42>
+Pai <pid: 7839> - <pid(parent): - > <value: 43>
+Pai <pid: 7839> - <pid(parent): - > <value: 44>
+Pai <pid: 7839> - <pid(parent): - > <value: 45>
+Pai <pid: 7839> - <pid(parent): - > <value: 46>
+Pai <pid: 7839> - <pid(parent): - > <value: 47>
+Pai <pid: 7839> - <pid(parent): - > <value: 48>
+Pai <pid: 7839> - <pid(parent): - > <value: 49>
+Pai <pid: 7839> - <pid(parent): - > <value: 50>
+Pai <pid: 7839> - <pid(parent): - > <value: 51>
+Pai <pid: 7839> - <pid(parent): - > <value: 52>
+Pai <pid: 7839> - <pid(parent): - > <value: 53>
+Pai <pid: 7839> - <pid(parent): - > <value: 54>
+Pai <pid: 7839> - <pid(parent): - > <value: 55>
+Pai <pid: 7839> - <pid(parent): - > <value: 56>
+Pai <pid: 7839> - <pid(parent): - > <value: 57>
+Pai <pid: 7839> - <pid(parent): - > <value: 58>
+Pai <pid: 7839> - <pid(parent): - > <value: 59>
+Pai <pid: 7839> - <pid(parent): - > <value: 60>
+Pai <pid: 7839> - <pid(parent): - > <value: 61>
+Pai <pid: 7839> - <pid(parent): - > <value: 62>
+Pai <pid: 7839> - <pid(parent): - > <value: 63>
+Pai <pid: 7839> - <pid(parent): - > <value: 64>
+Pai <pid: 7839> - <pid(parent): - > <value: 65>
+Pai <pid: 7839> - <pid(parent): - > <value: 66>
+Pai <pid: 7839> - <pid(parent): - > <value: 67>
+Pai <pid: 7839> - <pid(parent): - > <value: 68>
+Pai <pid: 7839> - <pid(parent): - > <value: 69>
+Pai <pid: 7839> - <pid(parent): - > <value: 70>
+Pai <pid: 7839> - <pid(parent): - > <value: 71>
+Pai <pid: 7839> - <pid(parent): - > <value: 72>
+Pai <pid: 7839> - <pid(parent): - > <value: 73>
+Pai <pid: 7839> - <pid(parent): - > <value: 74>
+Pai <pid: 7839> - <pid(parent): - > <value: 75>
+Pai <pid: 7839> - <pid(parent): - > <value: 76>
+Pai <pid: 7839> - <pid(parent): - > <value: 77>
+Pai <pid: 7839> - <pid(parent): - > <value: 78>
+Pai <pid: 7839> - <pid(parent): - > <value: 79>
+Pai <pid: 7839> - <pid(parent): - > <value: 80>
+Pai <pid: 7839> - <pid(parent): - > <value: 81>
+Pai <pid: 7839> - <pid(parent): - > <value: 82>
+Pai <pid: 7839> - <pid(parent): - > <value: 83>
+Pai <pid: 7839> - <pid(parent): - > <value: 84>
+Pai <pid: 7839> - <pid(parent): - > <value: 85>
+Pai <pid: 7839> - <pid(parent): - > <value: 86>
+Pai <pid: 7839> - <pid(parent): - > <value: 87>
+Pai <pid: 7839> - <pid(parent): - > <value: 88>
+Pai <pid: 7839> - <pid(parent): - > <value: 89>
+Pai <pid: 7839> - <pid(parent): - > <value: 90>
+Pai <pid: 7839> - <pid(parent): - > <value: 91>
+Pai <pid: 7839> - <pid(parent): - > <value: 92>
+Pai <pid: 7839> - <pid(parent): - > <value: 93>
+Pai <pid: 7839> - <pid(parent): - > <value: 94>
+Pai <pid: 7839> - <pid(parent): - > <value: 95>
+Pai <pid: 7839> - <pid(parent): - > <value: 96>
+Pai <pid: 7839> - <pid(parent): - > <value: 97>
+Pai <pid: 7839> - <pid(parent): - > <value: 98>
+Pai <pid: 7839> - <pid(parent): - > <value: 99>Processo pai vai finalizar
+
+
+-----------------------------------------------------
+
+CONCLUSÂO
+
+a) É possível observar os processos executando em paralelo?
+Os processos pai e filho são executados por partes tal que o sistema operacional executa partes 
+dos processos alternadamente, podendo executar mais de uma parte de um mesmo processo 
+consecutivamente. Portanto, observa-se uma execução alternada que causa a sensação de paralelismo.
+
+b) Que alterações devem ser feitas em seu programa para que primeiro sejam exibidas as impressões do 
+neto, depois do filho e depois do pai?
+
+Após a criação do filho, o pai deve esperar o filho terminar de executar para continuar a sua 
+execução e o processo filho deve aguardar que o processo neto termine de executar para continuar 
+a sua execução. Isso é possível utilizando a função waitpid que "pausa" os processos até que o 
+processo filho termine de ser executado. Observe o código fonte do arquivo ex03_02.c utilizado para 
+obter o resultado de exibição das impressões do neto, depois do filho e, por fim, do pai.
+
+-----------------------------------------------------
+
+QUESTÃO 4) Crie um programa que realize a impressão da frase: "Alo mundo", no arquivo “alomundo.c”. Compile este programa. Em seguida, crie um programa que execute o programa alomundo criado por você. Utilize alguma função da família "execv" para realizar esta atividade.
+DICA: Para saber os protótipos das funções disponíveis execute o comando “man” no Terminal (para acessar o manual: "man execv").
+
+-----------------------------------------------------
+
+ex04.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+      int status = 0;
+      pid_t parentpid = getpid();
+
+      pid_t pid = fork();
+
+      char* const parameters[] = {NULL};
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+            execv("alomundo", parameters);
+                waitpid(pid, &status, 0);
+                printf("Processo pai finalizado!\n\n");
+                exit(0);
+        } else {
+                // Child
+                printf("\tProcesso filho inicializado...\n");
+                printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+                execv("alomundo", parameters);
+            printf("\tProcesso filho finalizado!\n\n");
+                exit(0);
+        }
+
+        return 0;
+}
+
+
+
+alomundo.c
+
+#include<stdio.h>
+
+int main() {
+
+   printf("\nAlo mundo\n");
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc alomundo.c -o alomundo
+$ gcc ex04.c -o ex04
+$ ./ex04
+
+-----------------------------------------------------
+
+RESULTADO
+
+Processo pai inicializado...
+pid: 8713 	 pid(child): 8714
+
+
+Alo mundo
+	Processo filho inicializado...
+	pid: 8714 	 pid(parent): 8713
+
+Alo mundo
+
+
+-----------------------------------------------------
+
+

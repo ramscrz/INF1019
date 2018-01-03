@@ -1,0 +1,1359 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1)  Execute o programa dado (exemplo de uso
+de semáforos) e verifique / explique sua
+execução.
+
+-----------------------------------------------------
+
+sem.c
+
+/* Exemplo de uso de semáforo*/
+
+#include<sys/sem.h>
+#include<unistd.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<ctype.h>
+
+union semun {
+	int val;
+	struct semid_ds *buf;
+	ushort * array;
+};
+
+// inicializa o valor do semáforo
+int setSemValue(int semId);
+
+// remove o semáforo
+void delSemValue(int semId);
+
+// operação P
+int semaforoP(int semId);
+
+//operação V
+int semaforoV(int semId);
+
+int main (int argc, char* argv[]) {
+
+	int i;
+	char letra = 'o';
+	int semId;
+
+	if(argc > 1) {
+		semId = semget (8752, 1, 0666 | IPC_CREAT);
+		setSemValue(semId);
+		letra = 'x';
+		sleep (2);
+	} else {
+
+		while((semId = semget (8752, 1, 0666)) < 0) {
+			putchar ('.'); 
+			fflush(stdout);
+			sleep (1);
+		}
+	}
+
+	for (i=0; i<10; i++) {
+		semaforoP(semId);
+		putchar (toupper(letra)); fflush(stdout);
+		sleep (rand() %3);
+		putchar (letra); fflush(stdout);
+		semaforoV(semId);
+		sleep (rand() %2);
+	}
+		
+	printf ("\nProcesso %d terminou\n", getpid());
+	
+	if (argc > 1) {
+		sleep(10);
+		delSemValue(semId);
+	}
+
+	return 0;
+}
+
+int setSemValue(int semId) {
+	union semun semUnion;
+
+	semUnion.val = 1;
+
+	return semctl(semId, 0, SETVAL, semUnion);
+}
+
+void delSemValue(int semId) {
+
+	union semun semUnion;
+
+	semctl(semId, 0, IPC_RMID, semUnion);
+}
+
+int semaforoP(int semId) {
+
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = -1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+
+	return 0;
+}
+
+int semaforoV(int semId) {
+
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = 1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o semaforo sem.c
+$ ./semaforo &
+$ ./semaforo 1
+
+-----------------------------------------------------
+
+RESULTADO
+
+
+[1] 10660
+....
+OoOoXxOoXxOoXxOoXxOoXxOoXxOoXxOoOoX
+Processo 10660 terminou
+xXxXx
+Processo 10661 terminou
+[1]+  Done                    ./semaforo
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui 4 funções para gerir a utilização do semáforo, nomeadamente a função setSemValue(int semId) que inicializa o semáforo de identificação semId com o valor 1 (semUnion.val = 1) utilizando semctl com a flag SETVAL; a função delSemValue que remove o semáforo utilizando a flag IPC_RMID na chamada da função semctl; a função semaforoP que bloqueia o acesso à região crítica (semop() utilizado com valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock); e a função semaforoV(int semId) que libera a região crítica bloqueada (semOP() utilizada co valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock).
+
+
+Na main do programa, há dois modos de execução do código. Se o programa for executado recebendo 1 argumento, então um semáforo de chave 8752 e de identificação semId é criado (semget com IPC_CREAT), o valor desse semaforo é inicializado com 1 (setSemValue) e o valor 'x' é atribuído à variável de impressão (letra = 'x'); o processo dorme por 2 segundos (sleep(2)). Se nenhum argumento for dado ao programa no momento da sua execução, então ele tenta acessar o semáforo de chave 8752 utilizando a função semget sem a flag IPC_CREAT (caso onde arg > 1 é falsa). Nesse caso, o programa fica executando semget até que ele retorne um valor maior que 0 indicando que o semáforo de chave 8752 foi encontrado. Enquanto ele aguarda que o semáforo seja encontrado, ele imprime '.' de segundo a segundo.
+
+Por isso, se o programa for primeiro executado sem argumentos (./semaforo &), então ele vai tentar acessar o semáforo inexistente de chave 8752. Se em seguida, o programa é executado com um argumento, ./semaforo 1, então ele cria o semáforo que o outro está tentando acessar, terminando o loop do processo resultante da primeira execução do programa. Assim, as duas instâncias prosseguem a execução. No código, em ambos os casos de execução, os programas executam um for que imprime um Oo a cada iteração (caso onde o programa foi executado sem argumento) e um Xx (caso onde o programa foi executado com argumento). Porém, o código de impressão dos caratéres está dentro de uma região crítica de modo que apenas um dos programas consegue executar uma iteração em um mesmo instante, isto é, os dois processos não podem imprimir caracteres ao mesmo tempo porque o semáforo (semId) é utilizado garantindo que o código de uma iteração do loop é executado somente por um processo de cada vez. Assim, após executado semaforoP, o acesso a qualquer código precedido por semaforoP fica bloqueado até que semaforoV seja chamado (ele é chamado no fim de cada iteração do for). O semaforoP é chamado a cada início do for.
+
+Por isso, observa-se o resultado de impressão Oo e Xx de forma alternada (mas sem padrão de impressão). O uso dos semáforos garante que apenas os conjuntos 'Oo' e 'Xx' são impressos na sequência de caracteres impressa (não ocorrendo 'OX' nem 'xo').
+
+O resultado observado está de acordo com o esperado. Dado que os for são de 10 iterações, Xx e Oo são impressos 10 vezes.
+
+-----------------------------------------------------
+
+QUESTÃO 2)  Produtor-Consumidor
+	Escreva um programa formado por dois
+processos concorrentes, leitor e impressor, que
+compartilham uma área de trabalho (memória)
+executando um loop infinito. Para sincronizar as
+suas ações, eles fazem uso de semáforos.
+	O processo leitor fica lendo caracteres da entrada
+padrão e colocando em um buffer de 16
+posições. Quando o buffer está cheio o processo
+impressor deve imprimi-lo na saída padrão.
+
+-----------------------------------------------------
+
+ex02.c
+
+#include<stdio.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/sem.h>
+#include<ctype.h>
+
+#define MAX 16
+
+union semun {
+	int val;
+	struct semid_ds *buf;
+	ushort * array;
+};
+
+// inicializa o valor do semáforo
+int setSemValue(int semId);
+
+// remove o semáforo
+void delSemValue(int semId);
+
+// operação P
+int semaforoP(int semId);
+
+//operação V
+int semaforoV(int semId);
+
+// Function for the Consumer's activities execution.
+void consumer(char *data, int semId) {
+
+	int index = 0;
+
+	while(1) {
+
+		printf("\nCONSUMER WAITING TO ACESS CRITICAL REGION!\n");		
+
+		semaforoP(semId);
+
+		printf("\nCONSUMER ENTERED CRITICAL REGION!\n");
+
+		for(index = 0; index < MAX; index++) {
+			printf("\nConsumer reading: %c\n", data[index]);
+		}
+
+		semaforoV(semId);
+
+		sleep(2);
+
+	}
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+}
+
+// Function for the Producer's activities execution.
+void producer(char *data, int semId) {
+
+	int index = 0;
+
+	while(1) {		
+
+		printf("\nPRODUCER WAITING TO ACCESS CRITICAL REGION!\n");		
+
+		semaforoP(semId);
+
+		printf("\nPRODUCER ENTERED CRITICAL REGION!\n");
+
+		printf("\n\nEnter %d characters: \n\n", MAX);
+		for(index = 0; index < MAX; index++) {
+			scanf(" %c", &(data[index]));
+			fflush(stdout);
+			//printf("\nREAD CHAR = %c\n", data[index]);
+		}
+
+		semaforoV(semId);
+
+		printf("\n\nPRODUCER ENDED!\n\n");
+
+		sleep(1);
+
+	}
+
+}
+
+
+int main() {
+
+	pid_t pid = -1;
+
+	int segmentSharedData = 0;
+	char *data;
+
+	int i = 0, semId = 0;
+
+	segmentSharedData = shmget(IPC_PRIVATE, MAX * sizeof(char), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		exit(-1);
+	}
+
+	data = (char*) shmat(segmentSharedData, 0, 0);
+
+	shmctl(segmentSharedData, IPC_RMID, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	for(i = 0; i < MAX; i++) {
+
+		data[i] = '0';
+
+	}
+
+	semId = semget(8744, 1, 0666 | IPC_CREAT);
+	setSemValue(semId);
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	pid = fork();
+
+	if(pid > 0) {
+
+		producer(data, semId);
+
+	} else if(pid == 0) {
+
+		sleep(1);
+
+		consumer(data, semId);
+
+	} else {
+
+		if(data != NULL) {
+			shmdt(data);
+		}
+		sleep(10);
+		delSemValue(semId);
+
+		exit(1);
+
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	if(data != 0) {
+		shmdt(data);
+	}
+
+	return 0;
+
+}
+
+int setSemValue(int semId) {
+	union semun semUnion;
+
+	semUnion.val = 1;
+
+	return semctl(semId, 0, SETVAL, semUnion);
+}
+
+void delSemValue(int semId) {
+
+	union semun semUnion;
+
+	semctl(semId, 0, IPC_RMID, semUnion);
+}
+
+int semaforoP(int semId) {
+
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = -1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+
+	return 0;
+}
+
+int semaforoV(int semId) {
+
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = 1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex2 ex02.c
+$ ./ex2
+
+-----------------------------------------------------
+
+RESULTADO
+
+
+===== Producer-Consumer Algorithm =====
+
+
+PRODUCER WAITING TO ACESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+
+Enter 16 characters: 
+
+
+CONSUMER WAITING TO ACESS CRITICAL REGION!
+Kyou wa tanoshikatta da to omoimasu!!
+
+
+PRODUCER ENDED!
+
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reading: K
+
+Consumer reading: y
+
+Consumer reading: o
+
+Consumer reading: u
+
+Consumer reading: w
+
+Consumer reading: a
+
+Consumer reading: t
+
+Consumer reading: a
+
+Consumer reading: n
+
+Consumer reading: o
+
+Consumer reading: s
+
+Consumer reading: h
+
+Consumer reading: i
+
+Consumer reading: k
+
+Consumer reading: a
+
+Consumer reading: t
+
+PRODUCER WAITING TO ACESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+
+Enter 16 characters: 
+
+
+
+PRODUCER ENDED!
+
+
+
+CONSUMER WAITING TO ACESS CRITICAL REGION!
+PRODUCER WAITING TO ACESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reading: t
+
+Consumer reading: a
+
+Consumer reading: d
+
+Consumer reading: a
+
+Consumer reading: t
+
+Consumer reading: o
+
+Consumer reading: o
+
+Consumer reading: m
+
+Consumer reading: o
+
+Consumer reading: i
+
+Consumer reading: m
+
+Consumer reading: a
+
+Consumer reading: s
+
+Consumer reading: u
+
+Consumer reading: !
+
+Consumer reading: !
+
+PRODUCER ENTERED CRITICAL REGION!
+
+
+Enter 16 characters: 
+
+
+CONSUMER WAITING TO ACESS CRITICAL REGION!
+^C
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui 4 funções para gerir a utilização do semáforo, nomeadamente a função setSemValue(int semId) que inicializa o semáforo de identificação semId com o valor 1 (semUnion.val = 1) utilizando semctl com a flag SETVAL; a função delSemValue que remove o semáforo utilizando a flag IPC_RMID na chamada da função semctl; a função semaforoP que bloqueia o acesso à região crítica (semop() utilizado com valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock); e a função semaforoV(int semId) que libera a região crítica bloqueada (semOP() utilizada co valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock).
+
+
+O programa possui duas funções que controlam o acesso ao recurso crítico segundo o modelo Produtor-Consumidor, nomeadamente as funções producer e consumer. Nesse caso, o recurso crítico é um vetor de char com 16 posições (16 caracteres). Ambas as funções, produtor e consumidor, executam dentro da região crítica fazendo leitura e escrita no recurso partilhado (data, um array de char). Por isso, tanto o produtor quanto o consumidor, utilizam um semaforo em comum de identificação semId. Antes que o consumidor e o produtor acessem a região crítica, a função semaforoP é chamada para garantir que apenas um dos processos entra na região crítica por vez (ou o producer acessa a região crítica, ou o consumer acessa a região crítica). A primeira função a executar semaforoP é a função que ganha o acesso à região crítica. O consumidor aguarda 1 segundo para tentar acessar a região crítica, garantindo que o produtor acessa a região crítica primeiro no início. Ao fim da execução dentro da região crítica em cada um, produtor e consumidor, eles são pausados (sleep(1)) por um segundo. Assim, os processos consumidor e produtor são executados de forma alternada, uma vez um e outra vez o outro. O produtor lê do teclado 16 caracteres (scanf) e armazena os caracteres no array de char que é o recurso compartilhado (região crítica). A função producer é executada pelo processo pai e a função consumer é executada pelo processo filho. O recurso compartilhado está alocado em memória compartilhada (shmget). Tanto o consumer quanto o producer acessam o recurso compartilhado data apenas após executar semaforoP (entrada em região crítica). Após a execução de uma interação, o processo chma sleep(1) para dar a vez de acesso à região crítica ao outro processo. O consumidor acessa o recurso compartilhado (região crítica) e lê os 16 caracteres armazenados nesse recurso compartilhado. Assim, o consumidor lê os 16 caracteres lidos do teclado pelo produtor.
+
+No exemplo de execução, a frase "Kyou wa tanoshikatta da to omoimasu!!" serve de entrada para o processo produtor. Essa frase tem 32 caracteres, então como o scanf armazena em buffer os caracteres de entrada, o consumidor é executado duas vezes imprimindo primeiro os 16 primeiros caracteres da frase de entrada e na segunda vez os 16 últimos caracteres da frase de entrada, tal que na segunda vez que o produtor acessa a região crítica nenhum input do teclado é necessário para que o produtor saia da região crítica cedendo o acesso à região crítica para o consumidor.
+
+O resultado está de acordo com o esperado. Dado que cada programa imprime 10 vezes Oo ou Xx, então é esperado que haja exatamente essa quantida de sequências impressas no terminal. Isso se verifica.
+
+-----------------------------------------------------
+
+QUESTÃO 3) Faça programas para alterar um valor de
+uma variável na memória compartilhada.
+Um programa soma 1 à variável e o outro
+soma 5 à variável. Utilize semáforos para
+alterar a variável (região crítica).
+
+-----------------------------------------------------
+
+ex03C.c
+
+#include<stdio.h>
+#include"semF.h"
+#include<unistd.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/wait.h>
+#include<string.h>
+#include<errno.h>
+
+int main(int argc, char** argv) {
+
+	int segmentSharedData = 0;
+	int *data = NULL;
+
+	int index = 0, semId = 0;
+
+	semId = strtol(argv[1], NULL, 10);
+
+	segmentSharedData = shmget(strtol(argv[2], NULL, 10), sizeof(int), S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("\nERRO 3 %d\n", segmentSharedData);
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	data = (int*) shmat(segmentSharedData, 0, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+
+		printf("\nCONSUMER WAITING TO ACCESS CRITICAL REGION!\n");		
+
+		semaforoP(semId);
+
+		printf("\nCONSUMER ENTERED CRITICAL REGION!\n");
+
+		(*data)++;
+
+		printf("\nConsumer reads (+1 performed): %d\n", *data);
+
+		semaforoV(semId);
+
+	}
+
+	shmdt(data);
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+	return 0;
+
+}
+
+
+ex03P.c
+
+#include<stdio.h>
+#include"semF.h"
+#include<unistd.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/wait.h>
+#include<string.h>
+#include<errno.h>
+
+int main(int argc, char** argv) {
+
+	int segmentSharedData = 0;
+	int *data = NULL;
+
+	int index = 0, semId = 0;
+
+	semId = strtol(argv[1], NULL, 10);
+
+	segmentSharedData = shmget(strtol(argv[2], NULL, 10), sizeof(int), S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("\nERRO 4\n");
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	data = (int*) shmat(segmentSharedData, 0, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+
+		printf("\nPRODUCER WAITING TO ACCESS CRITICAL REGION!\n");
+
+		semaforoP(semId);
+
+		printf("\nPRODUCER ENTERED CRITICAL REGION!\n");
+
+		(*data) += 5;
+
+		printf("\nProducer reads (+5 performed): %d\n", *data);
+
+		semaforoV(semId);
+
+	}
+
+	shmdt(data);
+
+	return 0;
+
+}
+
+
+ex03.c
+
+#include<stdio.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/sem.h>
+#include<ctype.h>
+#include<string.h>
+#include"semF.h"
+#include<errno.h>
+
+int main() {
+
+	pid_t pid = -1, pidC = -1;
+
+	char **arg;
+
+	int index = 0, semId = 0, segmentSharedData = 0;
+
+	semId = semget(8744, 1, 0666 | IPC_CREAT);
+	setSemValue(semId);
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	arg = (char**) malloc(3 * sizeof(char*));
+
+	if(arg == NULL) {
+		printf("\nERRO 1\n");
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+		arg[index] = (char*) malloc (30 * sizeof(char));
+	}
+
+	sprintf(arg[1], "%d", semId);
+
+	sprintf(arg[2], "%d", 2765 + rand()%50);
+
+	segmentSharedData = shmget(strtol(arg[2], NULL, 10), sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	arg[3] = NULL;
+
+	pidC = fork();
+
+	if(pidC > 0) {
+
+		pid = fork();
+
+		if(pid > 0) {
+
+			waitpid(pid, NULL, 0);
+
+		} else if(pid == 0) {
+
+			strcpy(arg[0], "ex03P");
+
+			execv(arg[0], arg);
+
+			printf("\nERRO PRODUTOR: %s %s\n", arg[0], arg[1]);
+
+		} else {
+
+			exit(1);
+
+		}
+
+		waitpid(pidC, NULL, 0);
+
+	} else if(pidC == 0) {
+
+		strcpy(arg[0], "ex03C");
+
+		execv(arg[0], arg);
+
+		printf("\nERRO CONSUMIDOR: %s %s\n", arg[0], arg[1]);
+
+	} else {
+
+		exit(1);
+
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	delSemValue(semId);
+	shmctl(segmentSharedData, IPC_RMID, 0);
+
+	return 0;
+
+}
+
+
+
+semF.c
+
+#include"semF.h"
+#include<unistd.h>
+#include<sys/sem.h>
+
+int setSemValue(int semId) {
+   union semun semUnion;
+
+   semUnion.val = 1;
+
+   return semctl(semId, 0, SETVAL, semUnion);
+}
+
+void delSemValue(int semId) {
+
+   union semun semUnion;
+
+   semctl(semId, 0, IPC_RMID, semUnion);
+}
+
+int semaforoP(int semId) {
+
+   struct sembuf semB;
+   semB.sem_num = 0;
+   semB.sem_op = -1;
+   semB.sem_flg = SEM_UNDO;
+   semop(semId, &semB, 1);
+
+   return 0;
+}
+
+int semaforoV(int semId) {
+
+   struct sembuf semB;
+   semB.sem_num = 0;
+   semB.sem_op = 1;
+   semB.sem_flg = SEM_UNDO;
+   semop(semId, &semB, 1);
+
+   return 0;
+}
+
+
+
+
+semF.h
+
+#ifndef SEMF_H
+#define SEMF_H
+
+#include<stdlib.h>
+
+union semun {
+   int val;
+   struct semid_ds *buf;
+   ushort * array;
+};
+
+// inicializa o valor do semáforo
+int setSemValue(int semId);
+
+// remove o semáforo
+void delSemValue(int semId);
+
+// operação P
+int semaforoP(int semId);
+
+//operação V
+int semaforoV(int semId);
+
+#endif
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex3P ex03P.c semF.c
+$ gcc -o ex3C ex03C.c semF.c
+$ gcc -o ex3 ex03.c semF.c
+$ ./ex3
+
+-----------------------------------------------------
+
+RESULTADO
+
+RESULTADO 1 (Primeira Execução)
+
+===== Producer-Consumer Algorithm =====
+
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+Consumer reads (+1 performed): 1
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 6
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reads (+1 performed): 7
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 12
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reads (+1 performed): 13
+
+
+CONSUMER ENDED!
+
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 18
+
+
+ ===== END OF EXECUTION! =====
+
+
+
+Segunda Execução
+
+===== Producer-Consumer Algorithm =====
+
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reads (+1 performed): 1
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reads (+1 performed): 2
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Consumer reads (+1 performed): 3
+
+
+CONSUMER ENDED!
+
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 8
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 13
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Producer reads (+5 performed): 18
+
+
+ ===== END OF EXECUTION! =====
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui um módulo semF (semF.c; semF.h) que contém 4 funções para gerir a utilização do semáforo, nomeadamente a função setSemValue(int semId) que inicializa o semáforo de identificação semId com o valor 1 (semUnion.val = 1) utilizando semctl com a flag SETVAL; a função delSemValue que remove o semáforo utilizando a flag IPC_RMID na chamada da função semctl; a função semaforoP que bloqueia o acesso à região crítica (semop() utilizado com valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock); e a função semaforoV(int semId) que libera a região crítica bloqueada (semOP() utilizada co valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock).
+
+
+Existem dois programas, o programa consumidor ex03C que soma 1 à variável compartilhada data (memória compartilhada) e o programa produtor ex03P que soma 5 à variável compartilhada data (memória compartilhada). O programa main cria a variável compartilhada e inicializa a variável com 0. Essa variável é alocada em memória compartilhada usando shmget e inicializa a variável com 0. A main também cria um semáforo chamando semget com a flag IPC_CREAT. Tanto o semáforo quanto a variável inteira em memória compartilhada são acessados pelos programas produtor e consumidor. Para isso, a identificação da memória compartilhada (segmento) e a identificação semId do semáforo são passados para os processos produtor e consumidor, executados como processos filhos de um mesmo processo pai utilizando execv. O programa produtor recupera a variável compartilhada e o semáforo. Em seguida, ele realiza 3 iterações dentro da região crítica, isto é, acessando a variável compartilhada data após chamar semaforoP que bloqueia qualquer execução precedida por semaforoP em qualquer outro processo (desde que o semId passado à semaforoP seja o mesmo). O programa consumidor faz o mesmo. Porém, no caso do programa produtor, ele soma 5 à variável inteira compartilhada data por iteração. O programa consumidor soma 1 à variável inteira compartilhada data por iteração. Consequentemente apenas um dos processos filhos, consumidor ou produtor, conseguem alterar o valor da variável data em um mesmo momento. Os semaforos garantem isso. Ao fim de uma iteração, semaforoV é chamada para liberar o acesso à região crítica de acesso à variável compartilhada data.
+
+Segundo o observado, o resultado está de acordo com o esperado. Apenas o produtor ou o consumidor são executados por vez, eles nunca executam ao mesmo tempo e cada um faz a soma adequada esperada, observando que em ambos os processos a variável possui valor consistente com a última alteração sofrida seja pelo produtor ou pelo consumidor.
+
+Quando os processos filhos terminam de ser executados, shmctl(segmentSharedData, IPC_RMID, 0) é executado para remover o semaforo 
+
+O resultado está de acordo com o esperado. O resultado já é suficiente para observar que as somas estão corretas. Quando o produtor é executado, 5 é somado à data. Se o consumidor é executado, 1 é somado à data. A variável data é a variável compartilhada.
+
+Esse relatório inclui o resultado de duas execuções do programa. A ordem em que o consumidor e o produtor é executado dentro da região crítica é imprevisível, porém o semáforo garante que apenas um dos processos acessa a região crítica por vez.
+
+-----------------------------------------------------
+
+QUESTÃO 4)  Faça programas que utilizam a memória
+compartilhada para trocar mensagens. Utilize
+semáforos para sincronizar a aplicação.
+
+-----------------------------------------------------
+
+ex04C.c
+
+#include<stdio.h>
+#include"semF.h"
+#include<unistd.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/wait.h>
+#include<string.h>
+#include<errno.h>
+
+int main(int argc, char** argv) {
+
+	int segmentSharedData = 0;
+	char *data = NULL;
+
+	int index = 0, semId = 0;
+
+	semId = strtol(argv[1], NULL, 10);
+
+	segmentSharedData = shmget(strtol(argv[2], NULL, 10), 200 * sizeof(char), S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	data = (char*) shmat(segmentSharedData, 0, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+
+		printf("\nCONSUMER WAITING TO ACCESS CRITICAL REGION!\n");		
+
+		semaforoP(semId);
+
+		printf("\nCONSUMER ENTERED CRITICAL REGION!\n");
+
+		printf("\nReceived Message: %s\n", data);
+
+		if(index < 2) {
+			printf("\nEnter a message for the producer:\n");
+			scanf(" %[^\n]s", data);
+		}
+
+		semaforoV(semId);
+
+		sleep(1);
+
+	}
+
+	shmdt(data);
+
+	printf("\n\nCONSUMER ENDED!\n\n");
+
+	return 0;
+
+}
+
+
+ex04P.c
+
+#include<stdio.h>
+#include"semF.h"
+#include<unistd.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/wait.h>
+#include<string.h>
+#include<errno.h>
+
+int main(int argc, char** argv) {
+
+	int segmentSharedData = 0;
+	char *data = NULL;
+
+	int index = 0, semId = 0;
+
+	semId = strtol(argv[1], NULL, 10);
+
+	segmentSharedData = shmget(strtol(argv[2], NULL, 10), sizeof(char), S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("\nERRO 4\n");
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	data = (char*) shmat(segmentSharedData, 0, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+
+		printf("\nPRODUCER WAITING TO ACCESS CRITICAL REGION!\n");
+
+		semaforoP(semId);
+
+		printf("\nPRODUCER ENTERED CRITICAL REGION!\n");
+
+		printf("\nReceived Message: %s\n", data);
+
+		printf("\nEnter a message for the consumer:\n");
+		scanf(" %[^\n]s", data);
+
+		semaforoV(semId);
+
+		sleep(1);
+
+	}
+
+	shmdt(data);
+
+	return 0;
+
+}
+
+
+ex04.c
+
+#include<stdio.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdlib.h>
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<sys/sem.h>
+#include<ctype.h>
+#include<string.h>
+#include"semF.h"
+#include<errno.h>
+
+int main() {
+
+	pid_t pid = -1, pidC = -1;
+
+	char **arg;
+
+	char *data;
+
+	int index = 0, semId = 0, segmentSharedData = 0;
+
+	semId = semget(8744, 1, 0666 | IPC_CREAT);
+	setSemValue(semId);
+
+	printf("\n\n===== Producer-Consumer Algorithm =====\n\n");
+
+	arg = (char**) malloc(3 * sizeof(char*));
+
+	if(arg == NULL) {
+		printf("\nERRO 1\n");
+		exit(-1);
+	}
+
+	for(index = 0; index < 3; index++) {
+		arg[index] = (char*) malloc (30 * sizeof(char));
+	}
+
+	sprintf(arg[1], "%d", semId);
+
+	sprintf(arg[2], "%d", 1715 + rand()%50);
+
+	segmentSharedData = shmget(strtol(arg[2], NULL, 10), 200 * sizeof(char), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+	if(segmentSharedData < 0) {
+		printf("Something went wrong! %s\n", strerror(errno));
+		exit(-1);
+	}
+
+	data = (char*) shmat(segmentSharedData, 0, 0);
+
+	if(data == NULL) {
+
+		if(data != 0) {
+			shmdt(data);
+		}
+
+		exit(-1);
+	}
+
+	strcpy(data, "\n");
+
+	shmdt(data);
+
+	arg[3] = NULL;
+
+	pidC = fork();
+
+	if(pidC > 0) {
+
+		pid = fork();
+
+		if(pid > 0) {
+
+			waitpid(pid, NULL, 0);
+
+		} else if(pid == 0) {
+
+			strcpy(arg[0], "ex04P");
+
+			execv(arg[0], arg);
+
+			printf("\nERRO PRODUTOR: %s %s\n", arg[0], arg[1]);
+		} else {
+
+			exit(1);
+
+		}
+
+		waitpid(pidC, NULL, 0);
+
+	} else if(pidC == 0) {
+
+		strcpy(arg[0], "ex04C");
+
+		sleep(1);
+
+		execv(arg[0], arg);
+
+		printf("\nERRO CONSUMIDOR: %s %s\n", arg[0], arg[1]);
+
+	} else {
+
+		exit(1);
+
+	}
+
+	printf("\n\n ===== END OF EXECUTION! ===== \n\n");
+
+	shmctl(segmentSharedData, IPC_RMID, 0);
+
+	return 0;
+
+}
+
+
+semF.c
+
+#include"semF.h"
+#include<unistd.h>
+#include<sys/sem.h>
+
+int setSemValue(int semId) {
+   union semun semUnion;
+
+   semUnion.val = 1;
+
+   return semctl(semId, 0, SETVAL, semUnion);
+}
+
+void delSemValue(int semId) {
+
+   union semun semUnion;
+
+   semctl(semId, 0, IPC_RMID, semUnion);
+}
+
+int semaforoP(int semId) {
+
+   struct sembuf semB;
+   semB.sem_num = 0;
+   semB.sem_op = -1;
+   semB.sem_flg = SEM_UNDO;
+   semop(semId, &semB, 1);
+
+   return 0;
+}
+
+int semaforoV(int semId) {
+
+   struct sembuf semB;
+   semB.sem_num = 0;
+   semB.sem_op = 1;
+   semB.sem_flg = SEM_UNDO;
+   semop(semId, &semB, 1);
+
+   return 0;
+}
+
+
+
+
+semF.h
+
+#ifndef SEMF_H
+#define SEMF_H
+
+#include<stdlib.h>
+
+union semun {
+   int val;
+   struct semid_ds *buf;
+   ushort * array;
+};
+
+// inicializa o valor do semáforo
+int setSemValue(int semId);
+
+// remove o semáforo
+void delSemValue(int semId);
+
+// operação P
+int semaforoP(int semId);
+
+//operação V
+int semaforoV(int semId);
+
+#endif
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex4 ex04.c semF.c
+$ gcc -o ex4P ex04P.c semF.c
+$ gcc -o ex4C ex04C.c semF.c
+$ ./ex4
+
+-----------------------------------------------------
+
+RESULTADO
+
+===== Producer-Consumer Algorithm =====
+
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Received Message: 
+
+
+Enter a message for the consumer:
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+Hello there!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Received Message: Hello there!
+
+Enter a message for the producer:
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+Hello!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Received Message: Hello!
+
+Enter a message for the consumer:
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+Nice to meet you!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Received Message: Nice to meet you!
+
+Enter a message for the producer:
+
+PRODUCER WAITING TO ACCESS CRITICAL REGION!
+See you!
+
+PRODUCER ENTERED CRITICAL REGION!
+
+Received Message: See you!
+
+Enter a message for the consumer:
+
+CONSUMER WAITING TO ACCESS CRITICAL REGION!
+Later!
+
+CONSUMER ENTERED CRITICAL REGION!
+
+Received Message: Later!
+
+
+CONSUMER ENDED!
+
+
+
+ ===== END OF EXECUTION! ===== 
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui um módulo semF (semF.c; semF.h) que contém 4 funções para gerir a utilização do semáforo, nomeadamente a função setSemValue(int semId) que inicializa o semáforo de identificação semId com o valor 1 (semUnion.val = 1) utilizando semctl com a flag SETVAL; a função delSemValue que remove o semáforo utilizando a flag IPC_RMID na chamada da função semctl; a função semaforoP que bloqueia o acesso à região crítica (semop() utilizado com valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock); e a função semaforoV(int semId) que libera a região crítica bloqueada (semOP() utilizada co valor de operação -1 e flag SEM_UNDO que garante que o sistema continue funcionando mesmo que ocorra lock).
+
+O código dos módulos é bem semelhante ao código dos módulos do exercício 3 com a exceção da variável compartilhada ser um vetor de char que armazena uma mensagem. Assim como no ex02, há dois processos, um consumidor e um produtor, que são executados alternadamente, uma vez um e outra vez outro. A cada iteração de um processo, uma mensagem é lida do teclado e armazenada no recurso compartilhado que deverá ser lido pelo outro processo assim que a região crítica for desbloqueada. Isso ocorre nos dois sentidos, de produtor para consumidor e de consumidor para produtor. Ambos os processos, lêem e imprimem a frase lida que foi capturada pelo outro processo; em seguida o processo faz uma nova leitura do teclado, atualizando a string armazenada no recurso compartilhado. Assim como no outro, semaforos são utilizados para garantir que apenas um dos processos consumidor ou produtor acessem a região crítica, ou seja, execitem uma interação onde o valor do recurso compartilhada é alterado.
+
+Assim os processos trocam 3 mensagem entre eles. O resultado observado está de acordo com o esperado.
+A mensagem lida por um processo é lida pelo outro processo logo em seguida. Caso semáforos não fossem usados, o valor da string armazenada no recurso copartilhado poderia ser alterado durante a leitura para impressão do conteúdo.
+
+-----------------------------------------------------
+

@@ -1,0 +1,1273 @@
+
+	==============================================================
+		Relatório do Trabalho 2 de Sistemas da Computação (INF1019)
+	==============================================================
+
+Autor: Rafael Azevedo Moscoso Silva Cruz / Matrícula: 1221020
+Data: 11 de Dezembro de 2017
+
+Título do Trabalho: Simulando Memória Virtual e Substituição de Páginas LFU
+
+1. COMPILAÇÃO E EXECUÇÃO
+
+	COMPILAÇÃO:
+
+		gcc -g -o user userProgram.c PageFrameTable.c VM.c globalsettings.c Semaphore.c
+		gcc -g -o main MemoryManager.c PageFrameTable.c VM.c globalsettings.c Semaphore.c
+
+	EXECUÇÃO:
+
+		O executável interpreter espera obrigatoriamente receber dois parâmetros, o primeiro indicando o 
+		nome do arquivo texto que contém uma lista dos arquivos .log a serem lidos; e o segundo parâmetro
+		é o nome do executável do programa de usuário (programa responsável por ler os endereços virtuais 		de um arquivo .log, conforme especificação do trabalho).
+
+		./main programLogs user
+
+		O primeiro parâmetro é o nome de um arquivo que contém um nome de arquivo .log por linha. 
+		O texto abaixo exemplifica o conteúdo do arquivo programLogs.
+
+		compilador
+		matriz
+		compressor
+		simulador
+
+2. DETALHAMENTO DO PROGRAMA
+
+O trabalho proposto deve implementar um programa capaz de simular memória virtual, lendo o endereço virtual requisitado por um dos 4 processos em execução e traduzindo esse endereço para endereço físico e, caso o endereço virtual não esteja mapeado a um page frame da memória física, o simulador deve alocar um page frame vazio (quando possível) ou, caso todos os page frames estejam alocados, o algoritmo de substituição de página global LFU deve ser utilizado para alocar a página requisitada em um page frame da memória física.
+
+Dado que a política de substituição de página é global, uma página requisitante pode substituir uma página de qualquer outro processo que esteja alocada em um page frame. Isso permite que cada processo tenha mais opções de page frames onde podem alocar páginas faltantes, mas privilegia processos com mais operações de entrada e saída porque eles fazem mais requisições, com maior frequência, "roubando" constantemente page frames alocados para páginas de outros processos.
+
+O programa simula a paginação com LFU global em um sistema com 4 processos sendo executados. O processo pai é o gerenciador de memória e controla o fluxo principal da simualção.
+
+O programa simulador possui 5 módulos. O programa de usuário que lê um arquivo .log e requisita a tradução do endereço virtual para um endereço físico é composto por um único módulo. O arquivo programLogs é fundamental para a execução desse simulador. Por favor, mantê-lo no diretório do simulador.
+
+Esse trabalho contém os seguintes módulos e arquivo de código fonte:
+
+	globalsettings.h ; globalsettings.c => contém macros do programa e uma função obter os segundos atuais do tempo e imprimir a hora e a data correntes. As macros comentadas são utilizadas para debugar o programa. No arquivo globalsettings.h, há uma descrição para cada macro de debug e informações adicionais.
+	A macro N_USER_PROCESSES representa o número de processos, logo o número de programas a serem executados na simulação. O número de arquivos listados no arquivo programLogs deve ser igual ou mior que o valor da macro N_USER_PROCESSES. De acordo com a especificação do trabalho, o valor padrão dessa macro é 4.
+	A macro NUMBER_PAGE_FRAMES representa o número de page frames na memória principal. De acordo com a especificação do trabalho, o valor padrão dessa macro é 256.
+	A macro TIMEWINDOW representa o número de unidades de tempo da janela de tempo considerada pelo algoritmo LFU. De acordo com a especificação do trabalho, essa macro tem valor 30.
+
+	MemoryManager.c => módulo principal que inicia e executa a simulação. Esse módulo cria uma page table (struct Pagetable definida no módulo de memória virtual VM.c) para cada processo, de acordo com o valor da macro N_USER_PROCESSES. Uma PageFrameTable (struct definida no módulo PageFrameTable.c) também é criada para representar a tabela de quadros de página da memória física. Nesse caso, as tabelas de páginas (struct pageTable) e a tabela de quadros de página (struct pageFrameTable) são sincronizadas ao longo da simulação. O processo também lê o arquivo programLogs e aramzena o nome de cada programa a ser executado, na ordem em que estão no arquivo. Após a criação das tabelas e identificação do nome dos arquivos ;log a serem lidos pelos processos, N_USER_PROCESSES processos são criados através da chamada fork(). Um tabela de páginas é atribuída ao processo com a função assignPageTable. A função execv é utilizada para executar, em cada processo criado, o programa user (programa usuário), passando para o programa usuário alguns parâmetros, nomeadamente userProcessName[processIndex] (nome do arquivo .log), pidGM (pid do processo pai), processIndex (índice do processo, isto é um valor entre 0 e N_USER_PROCESSES), sharedMemSgmt(identificador do segmento da memória partilhada onde está a tabela de página destinada/atribuída ao processo), unblockedSem (um semáforo que costumava ser utilizado mas caiu em desuso, porém ele não foi eliminado do código). Tanto as tabelas de páginas quanto a tabela de quadros de página são armazenados em memória partilhada para garantir o acesso por todos os processos. 
+
+	A variável livingProcesses é utilizada para armazenar o número de processos ativos (vivos) que foram criados pelo MemoryManager (GM). Enquanto essa variável armazenar valor maior que zero, então ainda há pelo menos um processo requisitando tradução de endereços virtuais. Logo, o MemoryManager entra em um loop que dura toda a simulação. Nesse loop, as seguintes tarefas são executadas constantemente:
+
+	1) Verifica se há algum processo morto, ou seja, que terminou de ser executado. Caso exista e não tenha sido ainda contabilizado, ele é contado incrementando a variável deathCounter. Há um vetor processStopped (indexado pelo índice de cada processo) que armazena o estado do processo. Quando o proceso é contabilizado como terminado, ERASED_PROCESS é atribuído a processStopped[processIndex]. 
+
+	2) Verifica se há algum processo aguardando requisição de página, ou seja, aguardando que um page frame seja alocado a uma página requisitada faltante. Caso haja, a função searchLFUFramePage é chamada para determinar um alocar um page frame para a página requisitada faltante (eventualmente fazendo a substituição LFU). Essa função busca um page frame para alocar a página requisitada, dando prioridade para page frames não alocados, o que evita substituição de página. Caso seja necessária uma substituição de página, então o 2 é atribuído a timeLimit[processIndex] e o tempo atual (segundos) é atribuído a startTime[processIndex]. Caso contrário, 1 é atribuído a a timeLimit[processIndex] e o tempo atual (segundos) é atribuído a startTime[processIndex]. Esse valor corresponde ao tempo que o processo deve ficar suspenso antes de ter a requisição de página resolvida. Em ambos os casos, o processo passa para o estado WAITING_PROCESS (processStopped[processIndex]), indicando que o processo está aguardando o seu tempo em startTime[processIndex] para ter sua página requisitada alocada. Durante esse processo e o tempo de espera, o processo está bloqueado (SIGSTOP foi enviado ao processo quando o sinal SIGUSR1 foi recebido, esse sinal SIGUSR1 é enviado pelo processo requisitante). A função selectPageFrame é chamada para reservar a página escolhida pelo LFU para a página do processo requisitante. Essa informação é guardada no page frame reservado para o processo na tabela de quadros de páginas (PageFrameTable). Portanto, cada page frame possui um atributo que indica o pid do processo que vai ter sua página alocada nesse frame após o tempo de suspensão. 
+
+	3) Verifica o tempo decorrido para processos em estado WAITING_PROCESS (ou seja, processStopped[processIndex] == WAITING_PROCESS). Para cada processo aguardando o tempo de suspensão, a partir de startTime[processIndex] e timeLimit[processIndex] e do tempo atual, o tempo decorrido é calculado e pode ser determinado se o tempo de espera timeLimit[processIndex] já decorreu. Caso tenha decorrido, a página requisitada pelo respectivo processo é alocada para o page frame selecionado anteriormente pela função searchLFUFramePage. Em seguida, um sinal SIGUSR2 é enviado ao processo que perdeu o page frame, e um sinal SIGCONT é enviado ao processo requisitante, até então bloqueado. No programa usuário user, um handler foi configurado para o sinal SIGCONT, permitindo desbloquear o processo com um maior controle (nenhum outro sinal desbloqueia o processo). O processo foi bloqueado com uma variável de flag.
+
+	4) Verifica se o contador de processos terminados já atingiu o valor de N_USER_PROCESSES. Caso tenha atingido esse valor, então todos os processos morreram e todas as tabelas de páginas e a tabela de quadros de página podem ser desalocadas e destruídas. Quando um processo termina de executar, ele faz drop da tabela de página, isto é, atribuí a pageTable->ownerProcessPid o pid do processo pai, entregando a tabela de página de volta para o processo pai.
+
+	 
+	5) Verifica se a execução do programa foi interrompida. Um handler (forcedExitHandler) é configurado para tratar o sinal SIGINT nesse processo pai. Caso ocorra o sinal int, a variável interrupted recebe o valor 1. O loop do programa verifica o valor dessa variável interrupted constantemente, caso seja 1 o programa termina os processos filhos e desaloca toda a memória alocada, limpa tudo e encerra a execução. Isso foi implementado principalmente pelo fato dos arquivos de teste serem muito grandes e a execução demorar muito tempo para finalizar (esperei muito tempo mas em nenhuma das vezes a execução terminou devido ao tamanho enorme dos arquivos de teste, muitos endereços virtuais por processo para serem traduzidos em 256 quadros de página).
+
+	6) incrementTimeUnit(pageFrameTable) é executado também nesse loop e é responsável por fazer a contagem do tempo de simulação (tempo não real).
+
+	VM.c: módulo responsável por fazer operações com as tabelas de páginas e pela tradução de endereços virtuais em endereços físicos (função trans). Esse módulo implementa as structs page e pageTable, representando uma página e uma tabela de páginas respectivamente. Alguns semáforos eram utilizados mas foram abandonados mas a funcionalidade com os semáforos permaneceu implementada e por isso campos de semáforos ainda existem na struct. A struct page tem um campo MODIFIED_CONTROL_BIT modified que armazena se a página foi modificada; campo FRAMED_CONTROL_BIT framed que indica se a página está em um page frame da tabela de page frames; campo PAGE_INDEX pageIndex que indica o índice da página (16 bits). Esses são os campos principais da struct. A struct pageTable armazena waitingForPageRequest que indica se a página está bloqueada aguardando que uma página requisitada seja alocada em memória principal; waitingPageAccessMode que indica o modo (R ou W) do último acesso requisitado por endereço virtual; pageFrameTableSharedMemSegmt que representa o segmento de memória partilhada da tabela de páginas (utilizada para o processo usuário obter a tabela de páginas criada pelo módulo MemoryManager.c); page[NUMBER_PAGE_FRAMES] que representa as páginas da tabela de páginas; e outros campos que representam o índice da última página requisitada, o índice da última página perdida na memória física, índice do frame da última página perdida.
+
+	PageFrameTable: módulo responsável por fazer operações com as tabelas de frames de páginas e por administrar a contagem do tempo de simulação, assim como a quantidade de acessos requisitados em cada frame de página por unidade de tempo de simulação (timeWindowFrequency[TIMEWINDOW]). A struct pageFrameTable armazena um vetor dos quadros de página (pageFrames[NUMBER_PAGE_FRAMES]). A struct pageFrame armazena o pid do processo dono da página alocada nesse frame (caso tenha alguma página alocda nesse frame); o índice da página alocada nesse frame também é armazenado nesse struct assim como o estado do frame, se está ocupado ou não. Cada pageFrame também armazena a quantidade de acessos ocorridos por unidade de tempo de simulação TIMEWINDOW. O valor de timeWindowAccum representa o total de acessos ocorridos nos últimos TIMEWINDOW unidades de tempo. A pageFrameTable possui um campo timeCounter que faz a contagem do tempo de simulação (através da função incrementTimeUnit.
+
+	Page.h: módulo que contém a definição de enums e variáveis relacionadas com páginas e tabelas de páginas e tabelas de frames.
+
+	Semaphore.c: implementação de semáforos. Porém, na versão final do trabalho, os semáforos implementados não são utilizados. IMPORTANTE: as funcionalidades de semáforos estão implementadas embora não sejam utilizadas, então esse módulo é necessário para a compilação do código do trabalho.
+
+OBS: O algoritmo LFU escolhe a página que não foi modificada em caso de empate de número mínimo de acessos na janela de tempo dada.
+
+
+TABELA DE PÁGINAS E TABELA DE QUADROS DE PÁGINAS
+
+	As tabelas de páginas foram implementadas armazenando apenas o número máximo de frames (no caso 256). Isso reduz o espaço ocupado pelas tabelas de página.
+
+
+SOBRE A CONTAGEM DE TEMPO
+
+	A contagem de tempo em TIMEWINDOW unidades de tempo é feita com base na quantidade de acessos. O loop do módulo MemoryManager.c verifica constantemente se para a unidade de tempo atual há algum acesso a página, de qualquer processo. Se houver pelo menos um acesso, o incrementador de tempo passa o tempo para a unidade de tempo seguinte. Quando a contagem de tempo atinge o valor TIMEWINDOW, o contador volta para o valor inicial 0. Quando um processo acessa uma página, ele utiliza o valor atual do contador como índice de um vetor da page frame onde a página está alocada para somar um acesso naquele espaço do vetor que corresponde ao atual tempo de simulação. Logo, cada page frame possui um array circular, cujo indice é indicado pelo valor atual do contador de tempo (timeCounter).
+Quando o contador vai transitar para a próxima unidade de tempo, ele zera o valor de acessos contabilizados no vetor de cada page frame na posição timeCounter+1 (ou timeCounter = 0 caso tenha chegado ao fim fim de um ciclo da janela de tempo TIMEWINDOW).
+	Esse controle não permite prever de forma precisa a quantidade de acessos a página contabilizada para cada unidade de tempo da janela de tempo TIMEWINDOW unidades mais recentes. Por isso, é difícil de analisar com precisão as substituições de página sem conseguir prever exatamente o valor total de acessos de cada frame nos últimos TIMEWINDOW unidades de tempo. Porém a lógica do programa grante a lógica da utilização de uma janela de tempo TIMEWINDOW para o algoritmo LFU.
+
+
+
+Programa Usuário (user.c)
+
+Responsável por obter a tabela de página da memória compartilhada e ler os endereços virtuais de um arquivo .log, requisitando a tradução para um endereço físico. A requisição é feita ao MemoryManager quando a página requisitada não se encontra em memória física.
+
+Quando uma requisição é feita ao MemoryManager, o processo fica bloqueado e permanece bloqueado pelo tempo estipulado pelo MemoryManager (1 ou 2 segundos, depende do caso conforme a especificação do enunciado). Apenas o sinal SIGCONT desbloqueia o processo, que obtém a tradução do endereço virtual em físico e imprime na tela Px <HEX xxxxoooo> <DEC xxxxoooo> r/w, onde xxxxoooo são a contacatenação índice do page frame onde está alocada a página requisitada (valor mostrado em decimal DEC e hexadecimal HEX). O valor r/w indica se é leitura ou escrita. Se for leitura, a página foi modificada.
+
+*******************************************************
+
+TESTES (Utilizando os 4 arquivos .log fornecidos)
+
+	A execução até o fim demora muito e não foi executada. A simulação foi interrompida e as primeiras traduções de endereço virtual para físico foram analisadas de modo a validar o simulador.
+	Caso não especificado, os parâmetros usados são os do enunciado (número de frames, por exemplo).
+
+	arquivo programLogs:
+
+		matriz
+		compressor
+		simulador
+		compilador
+
+-----------------------------------------------------------------------------------
+
+TESTE 1 (execução interrompida após 5 segundos)
+
+	TIMEWINDOW 30 (Janela de tempo do LFU é das 30 últimas unidades de tempo)
+
+		Current Time: Mon Dec 11 23:38:55 2017
+
+
+=============== Start of Simulation: =================
+
+	Current Time: Mon Dec 11 23:38:55 2017
+
+
+Page Table assigned to process PID 26271
+Setting up process 03, PID = 26271 (26271)
+
+User Process 03, reads from file (.log) compilador
+
+Process 03 requires a page (PAGE INDEX <DEC 0065> <HEX 0041>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:55 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+
+Page Table assigned to process PID 26270
+Setting up process 02, PID = 26270 (26270)
+
+Page Table assigned to process PID 26269
+Setting up process 01, PID = 26269 (26269)
+
+User Process 02, reads from file (.log) simulador
+
+Process 02 requires a page (PAGE INDEX <DEC 7958> <HEX 1f16>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:55 2017
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+
+User Process 01, reads from file (.log) compressor
+
+Process 01 requires a page (PAGE INDEX <DEC 1970> <HEX 07b2>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:55 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+
+Page Table assigned to process PID 26268
+Setting up process 00, PID = 26268 (26268)
+
+User Process 00, reads from file (.log) matriz
+
+Process 00 requires a page (PAGE INDEX <DEC 6410> <HEX 190a>) not framed in physical memory!
+
+	Current Time: Mon Dec 11 23:38:55 2017
+
+
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+
+Page <Page Index 7958> of Process 026270 has been allocated in frame <Frame Index 1>!
+
+Process 2 unblocked! PID 26270
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+Page <Page Index 0065> of Process 026271 has been allocated in frame <Frame Index 0>!
+
+Process 3 unblocked! PID 26271
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+
+P3, <HEX 0000f7a0> <DEC 0000 63392>, r
+P2, <HEX 0001ff60> <DEC 0001 65376>, w
+
+
+Process 02 requires a page (PAGE INDEX <DEC 0066> <HEX 0042>) not framed in physical memory!
+Process 03 requires a page (PAGE INDEX <DEC 5109> <HEX 13f5>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 56s ; Duracao: 1s
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 56s ; Duracao: 1s
+
+Page <Page Index 6410> of Process 026268 has been allocated in frame <Frame Index 3>!
+
+Process 0 unblocked! PID 26268
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+Page <Page Index 1970> of Process 026269 has been allocated in frame <Frame Index 2>!
+
+Process 1 unblocked! PID 26269
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+
+
+PageFault received!
+
+P1, <HEX 000243a0> <DEC 0002 17312>, r
+
+Process 01 requires a page (PAGE INDEX <DEC 0034> <HEX 0022>) not framed in physical memory!
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 56s ; Duracao: 1s
+P0, <HEX 00037c20> <DEC 0003 31776>, r
+
+Process 00 requires a page (PAGE INDEX <DEC 14422> <HEX 3856>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:56 2017
+
+
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 56s ; Duracao: 1s
+
+Page <Page Index 0034> of Process 026269 has been allocated in frame <Frame Index 6>!
+
+Process 1 unblocked! PID 26269
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+Page <Page Index 0066> of Process 026270 has been allocated in frame <Frame Index 4>!
+
+Process 2 unblocked! PID 26270
+
+
+
+
+PageFault received!
+P1, <HEX 00068d40> <DEC 0006 36160>, r
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+P1, <HEX 00068d60> <DEC 0006 36192>, r
+
+Page <Page Index 5109> of Process 026271 has been allocated in frame <Frame Index 5>!
+
+Process 3 unblocked! PID 26271
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+P3, <HEX 0005e2c0> <DEC 0005 58048>, r
+
+
+Process 03 requires a page (PAGE INDEX <DEC 1511> <HEX 05e7>) not framed in physical memory!
+P1, <HEX 000243c0> <DEC 0002 17344>, r
+
+Process 01 requires a page (PAGE INDEX <DEC 0017> <HEX 0011>) not framed in physical memory!
+
+
+PageFault received!
+
+
+Time Counter = 1
+
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 57s ; Duracao: 1s
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 57s ; Duracao: 1s
+
+Page <Page Index 14422> of Process 026268 has been allocated in frame <Frame Index 7>!
+
+Process 0 unblocked! PID 26268
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+P0, <HEX 0007bbe0> <DEC 0007 48096>, w
+
+P0, <HEX 0003fc20> <DEC 0003 64544>, r
+
+
+Time Counter = 2
+
+
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 57s ; Duracao: 1s
+
+P2, <HEX 0004bf60> <DEC 0004 48992>, r
+
+
+	Current Time: Mon Dec 11 23:38:57 2017
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 57s ; Duracao: 1s
+
+Page <Page Index 5409> of Process 026268 has been allocated in frame <Frame Index 10>!
+
+Process 0 unblocked! PID 26268
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+Process 00 requires a page (PAGE INDEX <DEC 5409> <HEX 1521>) not framed in physical memory!
+Page <Page Index 0017> of Process 026269 has been allocated in frame <Frame Index 8>!
+
+
+
+
+PageFault received!
+P0, <HEX 000a6f00> <DEC 0010 28416>, r
+Process 1 unblocked! PID 26269
+
+
+P0, <HEX 00037c20> <DEC 0003 31776>, r
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+Page <Page Index 12073> of Process 026270 has been allocated in frame <Frame Index 11>!
+
+Process 2 unblocked! PID 26270
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+P0, <HEX 00037c28> <DEC 0003 31784>, r
+
+Page <Page Index 1511> of Process 026271 has been allocated in frame <Frame Index 9>!
+
+Process 3 unblocked! PID 26271
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+P0, <HEX 00037c28> <DEC 0003 31784>, r
+
+
+Time Counter = 3
+
+
+P3, <HEX 00098900> <DEC 0009 35072>, r
+
+Process 03 requires a page (PAGE INDEX <DEC 0071> <HEX 0047>) not framed in physical memory!
+
+
+
+P0, <HEX 0003ff38> <DEC 0003 65336>, r
+
+
+PageFault received!
+Time Counter = 4
+
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+
+P0, <HEX 00037b48> <DEC 0003 31560>, r
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 58s ; Duracao: 1s
+
+
+Time Counter = 5
+
+
+P0, <HEX 00037b48> <DEC 0003 31560>, r
+
+
+Time Counter = 6
+
+
+P0, <HEX 000a6f00> <DEC 0010 28416>, w
+
+
+Time Counter = 7
+
+
+
+
+Process 00 requires a page (PAGE INDEX <DEC 12971> <HEX 32ab>) not framed in physical memory!
+Time Counter = 8
+
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+Process 02 requires a page (PAGE INDEX <DEC 12073> <HEX 2f29>) not framed in physical memory!
+
+
+
+
+PageFault received!
+P2, <HEX 000b3f60> <DEC 0011 16224>, w
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 58s ; Duracao: 1s
+
+Process 02 requires a page (PAGE INDEX <DEC 0065> <HEX 0041>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+P1, <HEX 00083360> <DEC 0008 13152>, r
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 58s ; Duracao: 1s
+
+Process 01 requires a page (PAGE INDEX <DEC 0031> <HEX 001f>) not framed in physical memory!
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:38:58 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 58s ; Duracao: 1s
+
+Page <Page Index 12971> of Process 026268 has been allocated in frame <Frame Index 13>!
+
+Process 0 unblocked! PID 26268
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+
+Page <Page Index 0031> of Process 026269 has been allocated in frame <Frame Index 15>!
+
+Process 1 unblocked! PID 26269
+P0, <HEX 000d3a90> <DEC 0013 14992>, r
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+P0, <HEX 00037b58> <DEC 0003 31576>, r
+
+Page <Page Index 0065> of Process 026270 has been allocated in frame <Frame Index 14>!
+
+Process 2 unblocked! PID 26270
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+
+Page <Page Index 0071> of Process 026271 has been allocated in frame <Frame Index 12>!
+P0, <HEX 00037b58> <DEC 0003 31576>, r
+
+Process 3 unblocked! PID 26271
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+
+
+P0, <HEX 00037b60> <DEC 0003 31584>, r
+Time Counter = 9
+
+
+P3, <HEX 000c58a0> <DEC 0012 22688>, r
+
+
+
+P0, <HEX 000d3aa0> <DEC 0013 15008>, r
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 59s ; Duracao: 1s
+
+
+
+Time Counter = 10
+
+P0, <HEX 0003ff70> <DEC 0003 65392>, r
+
+P0, <HEX 00037b68> <DEC 0003 31592>, r
+
+
+Time Counter = 11
+
+
+P0, <HEX 00037b68> <DEC 0003 31592>, r
+
+
+Time Counter = 12
+
+
+
+
+Time Counter = 13
+
+Process 00 requires a page (PAGE INDEX <DEC 7854> <HEX 1eae>) not framed in physical memory!
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 59s ; Duracao: 1s
+
+P2, <HEX 000ef760> <DEC 0014 63328>, r
+
+Process 02 requires a page (PAGE INDEX <DEC 14273> <HEX 37c1>) not framed in physical memory!
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 59s ; Duracao: 1s
+P1, <HEX 000fe308> <DEC 0015 58120>, r
+
+P1, <HEX 00083380> <DEC 0008 13184>, r
+
+P1, <HEX 000fe2f0> <DEC 0015 58096>, r
+
+
+Time Counter = 14
+
+
+P1, <HEX 000833a0> <DEC 0008 13216>, r
+
+
+Time Counter = 15
+
+
+P1, <HEX 000833c0> <DEC 0008 13248>, r
+
+
+Time Counter = 16
+
+
+P1, <HEX 0006ccb0> <DEC 0006 52400>, r
+
+
+Time Counter = 17
+
+
+P1, <HEX 000833e0> <DEC 0008 13280>, r
+
+
+Time Counter = 18
+
+
+P1, <HEX 00083400> <DEC 0008 13312>, r
+
+
+Time Counter = 19
+
+
+P1, <HEX 0006ccc0> <DEC 0006 52416>, r
+
+
+Time Counter = 20
+
+
+P1, <HEX 00083420> <DEC 0008 13344>, r
+
+
+Time Counter = 21
+
+
+Process 01 requires a page (PAGE INDEX <DEC 0032> <HEX 0020>) not framed in physical memory!
+
+
+
+
+PageFault received!
+Time Counter = 22
+
+
+	Current Time: Mon Dec 11 23:38:59 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 59s ; Duracao: 1s
+
+Page <Page Index 7854> of Process 026268 has been allocated in frame <Frame Index 17>!
+
+Process 0 unblocked! PID 26268
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+
+
+
+PageFault received!
+P0, <HEX 0011f710> <DEC 0017 63248>, r
+Page <Page Index 0032> of Process 026269 has been allocated in frame <Frame Index 19>!
+
+Process 1 unblocked! PID 26269
+
+P0, <HEX 00037b68> <DEC 0003 31592>, r
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+Page <Page Index 14273> of Process 026270 has been allocated in frame <Frame Index 18>!
+
+Process 2 unblocked! PID 26270
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+Process 00 requires a page (PAGE INDEX <DEC 8198> <HEX 2006>) not framed in physical memory!
+
+
+
+PageFault received!
+Page <Page Index 12596> of Process 026271 has been allocated in frame <Frame Index 16>!
+
+Process 3 unblocked! PID 26271
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+
+Time Counter = 23
+
+Process 03 requires a page (PAGE INDEX <DEC 12596> <HEX 3134>) not framed in physical memory!
+
+
+
+PageFault received!
+P3, <HEX 00108900> <DEC 0016 35072>, w
+
+
+PageFault received!
+
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+P2, <HEX 0012f760> <DEC 0018 63328>, w
+
+Process 03 requires a page (PAGE INDEX <DEC 0074> <HEX 004a>) not framed in physical memory!
+
+
+
+
+PageFault received!
+P2, <HEX 000ef840> <DEC 0014 63552>, r
+(Overwrite Empty Frame) Process 00 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 0s ; Duracao: 1s
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 03 PageFault Penalty Time Interval: START TIME = 0s ; Duracao: 1s
+
+P2, <HEX 000ef860> <DEC 0014 63584>, r
+
+
+Time Counter = 24
+
+
+Process 02 requires a page (PAGE INDEX <DEC 1990> <HEX 07c6>) not framed in physical memory!
+
+
+
+
+PageFault received!
+Time Counter = 25
+
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+
+
+(Overwrite) Process 02 PageFault Penalty Time Interval: START TIME = 0s ; Duracao: 1s
+P1, <HEX 0013a980> <DEC 0019 43392>, r
+
+P1, <HEX 0013a968> <DEC 0019 43368>, r
+
+P1, <HEX 00083440> <DEC 0008 13376>, r
+
+
+Time Counter = 26
+
+
+P1, <HEX 00083460> <DEC 0008 13408>, r
+
+
+Time Counter = 27
+
+
+Process 01 requires a page (PAGE INDEX <DEC 0025> <HEX 0019>) not framed in physical memory!
+
+
+PageFault received!
+
+
+Time Counter = 28
+
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+(Overwrite Empty Frame) Process 01 PageFault Penalty Time Interval: 1s
+
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 0s ; Duracao: 1s
+^C
+=============== End of Simulation: ===============
+
+	Current Time: Mon Dec 11 23:39:00 2017
+
+
+Process P0 removed!
+
+Process P1 removed!
+
+Process P2 removed!
+
+Process P3 removed!
+
+
+De forma mais organizada, esse é o resultado das primeiras traduções de virtual para físico da simulação.
+
+(Overwrite Empty Frame) Process 03 PageFault Penalty Time Interval: 1s
+(Overwrite Empty Frame) Process 02 PageFault Penalty Time Interval: 1s
+P3, <HEX 0000f7a0> <DEC 0000 63392>, r
+P2, <HEX 0001ff60> <DEC 0001 65376>, w
+(Overwrite) Process 01 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+(Overwrite) Process 00 PageFault Penalty Time Interval: START TIME = 55s ; Duracao: 1s
+P1, <HEX 000243a0> <DEC 0002 17312>, r
+P0, <HEX 00037c20> <DEC 0003 31776>, r
+P1, <HEX 00068d40> <DEC 0006 36160>, r
+P1, <HEX 00068d60> <DEC 0006 36192>, r
+P3, <HEX 0005e2c0> <DEC 0005 58048>, r
+P1, <HEX 000243c0> <DEC 0002 17344>, r
+P0, <HEX 0007bbe0> <DEC 0007 48096>, w
+P0, <HEX 0003fc20> <DEC 0003 64544>, r
+
+A penalidade de 1 segundo está de acordo com o esperado. O resultado mostra também que páginas requisitadas já alocadas na memória principal foram acessadas diretamente. No início, como há 256 frames não ocupados, as páginas requisitadas faltantes são mapeadas para um dos frames livres e o tempo de penalidade é de 1 segundo. Para que se verifique a troca de página e a penalidade de 2 segundos nos casos em que as páginas selecionadas pelo LFU foram modificadas, uma simulação mais longa é necessária, conforme os testes abaixo. Enquanto há frames livres, no há necessidade de substituição.
+
+
+-----------------------------------------------------------------------------------
+ 
+TESTE 2 (leitura de comandos do arquivo teste02)
+
+	TIMEWINDOW 30 (Janela de tempo do LFU é das 30 últimas unidades de tempo)
+
+	P1, <HEX 00185a40> <DEC 0024 23104>, w
+
+
+Time Counter = 21
+
+
+P1, <HEX 00185a60> <DEC 0024 23136>, w
+
+
+Time Counter = 22
+
+
+P1, <HEX 00185a80> <DEC 0024 23168>, w
+
+
+Time Counter = 23
+
+
+P1, <HEX 00185aa0> <DEC 0024 23200>, w
+
+
+Time Counter = 24
+
+
+
+
+P1, <HEX 00185ac0> <DEC 0024 23232>, w
+Time Counter = 25
+
+
+P1, <HEX 00185ae0> <DEC 0024 23264>, w
+
+
+Time Counter = 26
+
+
+P1, <HEX 00185b00> <DEC 0024 23296>, w
+
+
+Time Counter = 27
+
+
+P1, <HEX 00185b20> <DEC 0024 23328>, w
+
+
+Time Counter = 28
+
+
+P1, <HEX 00185b40> <DEC 0024 23360>, w
+
+
+Time Counter = 29
+
+
+P1, <HEX 00185b60> <DEC 0024 23392>, w
+
+
+Time Counter = 0
+
+
+P1, <HEX 00185b80> <DEC 0024 23424>, w
+
+
+Time Counter = 1
+
+
+P1, <HEX 00185ba0> <DEC 0024 23456>, w
+
+
+Time Counter = 2
+
+
+
+
+P1, <HEX 00185bc0> <DEC 0024 23488>, w
+Time Counter = 3
+
+
+P1, <HEX 00185be0> <DEC 0024 23520>, w
+
+
+Time Counter = 4
+
+
+P1, <HEX 00185c00> <DEC 0024 23552>, w
+
+
+Time Counter = 5
+
+
+P1, <HEX 00185c20> <DEC 0024 23584>, w
+
+
+Time Counter = 6
+
+
+P1, <HEX 00185c40> <DEC 0024 23616>, w
+
+
+Time Counter = 7
+
+
+P1, <HEX 00185c60> <DEC 0024 23648>, w
+
+
+Time Counter = 8
+
+
+P1, <HEX 00185c80> <DEC 0024 23680>, w
+
+
+Time Counter = 9
+
+
+
+
+P1, <HEX 00185ca0> <DEC 0024 23712>, w
+Time Counter = 10
+
+
+P1, <HEX 00185cc0> <DEC 0024 23744>, w
+
+
+Time Counter = 11
+
+
+P1, <HEX 00185ce0> <DEC 0024 23776>, w
+
+
+Time Counter = 12
+
+
+P1, <HEX 00185d00> <DEC 0024 23808>, w
+
+
+Time Counter = 13
+
+
+P1, <HEX 00185d20> <DEC 0024 23840>, w
+
+
+Time Counter = 14
+
+
+P1, <HEX 00185d40> <DEC 0024 23872>, w
+
+
+Time Counter = 15
+
+
+P1, <HEX 00185d60> <DEC 0024 23904>, w
+
+
+Time Counter = 16
+
+
+P1, <HEX 00185d80> <DEC 0024 23936>, w
+
+
+Time Counter = 17
+
+
+
+
+P1, <HEX 00185da0> <DEC 0024 23968>, w
+Time Counter = 18
+
+
+P1, <HEX 00185dc0> <DEC 0024 24000>, w
+
+
+Time Counter = 19
+
+
+P1, <HEX 00185de0> <DEC 0024 24032>, w
+
+
+Time Counter = 20
+
+
+P1, <HEX 00185e00> <DEC 0024 24064>, w
+
+
+Time Counter = 21
+
+
+P1, <HEX 00185e20> <DEC 0024 24096>, w
+
+
+Time Counter = 22
+
+
+P1, <HEX 00185e40> <DEC 0024 24128>, w
+
+
+Time Counter = 23
+
+
+P1, <HEX 00185e60> <DEC 0024 24160>, w
+
+
+Time Counter = 24
+
+
+
+
+P1, <HEX 00185e80> <DEC 0024 24192>, w
+Time Counter = 25
+
+
+P1, <HEX 00185ea0> <DEC 0024 24224>, w
+
+
+Time Counter = 26
+
+
+P1, <HEX 00185ec0> <DEC 0024 24256>, w
+
+
+Time Counter = 27
+
+
+Process 01 requires a page (PAGE INDEX <DEC 0036> <HEX 0024>) not framed in physical memory!
+
+
+
+
+PageFault received!
+Time Counter = 28
+
+
+	Current Time: Mon Dec 11 23:54:02 2017
+
+
+(LFU Save Modified Page) Process 01 PageFault Penalty Time Interval: 2s
+
+(LFU) Process 01 PageFault Penalty Time Interval: START TIME = 2s ; Duracao: 2s
+
+(LFU) Page Process 01 lost a page (PAGE INDEX: 2fda) allocated in page frame 1!
+
+Page <Page Index 8363> of Process 026385 has been allocated in frame <Frame Index 1>!
+
+Process 0 unblocked! PID 26385
+
+	Current Time: Mon Dec 11 23:54:03 2017
+
+
+
+Page <Page Index 7438> of Process 026387 has been allocated in frame <Frame Index 2>!
+(LFU) Page Process 00 lost a page (PAGE INDEX: 190a) allocated in page frame 1!
+
+Process 2 unblocked! PID 26387
+
+P0, <HEX 00019778> <DEC 0001 38776>, r
+
+	Current Time: Mon Dec 11 23:54:03 2017
+
+
+Process 00 requires a page (PAGE INDEX <DEC 6410> <HEX 190a>) not framed in physical memory!
+
+
+PageFault received!
+
+(LFU) Page Process 02 lost a page (PAGE INDEX: 3be2) allocated in page frame 4!
+
+	Current Time: Mon Dec 11 23:54:03 2017
+
+
+
+P2, <HEX 00021fa0> <DEC 0002 8096>, w
+(LFU Overwrite) Process 00 PageFault Penalty Time Interval: 1s
+
+(LFU) Process 00 PageFault Penalty Time Interval: START TIME = 3s ; Duracao: 1s
+
+
+(LFU) Page Process 00 lost a page (PAGE INDEX: 190a) allocated in page frame 1!
+P2, <HEX 00fa9fc0> <DEC 0250 40896>, w
+
+
+
+Time Counter = 29
+
+P2, <HEX 00819f80> <DEC 0129 40832>, w
+
+Process 02 requires a page (PAGE INDEX <DEC 1482> <HEX 05ca>) not framed in physical memory!
+
+
+Time Counter = 0
+
+
+
+PageFault received!
+
+	Current Time: Mon Dec 11 23:54:03 2017
+
+
+(LFU Save Modified Page) Process 02 PageFault Penalty Time Interval: 2s
+
+(LFU) Process 02 PageFault Penalty Time Interval: START TIME = 3s ; Duracao: 2s
+
+(LFU) Page Process 02 lost a page (PAGE INDEX: 3be2) allocated in page frame 4!
+
+Page <Page Index 0000> of Process 026388 has been allocated in frame <Frame Index 3>!
+
+Process 3 unblocked! PID 26388
+
+	Current Time: Mon Dec 11 23:54:04 2017
+
+
+
+Page <Page Index 6410> of Process 026385 has been allocated in frame <Frame Index 1>!
+P3, <HEX 0003ff00> <DEC 0003 65280>, r
+
+Process 0 unblocked! PID 26385
+
+
+	Current Time: Mon Dec 11 23:54:04 2017
+
+Process 03 requires a page (PAGE INDEX <DEC 12147> <HEX 2f73>) not framed in physical memory!
+
+
+PageFault received!
+
+(LFU) Page Process 00 lost a page (PAGE INDEX: 20ab) allocated in page frame 1!
+
+
+P0, <HEX 00017bd8> <DEC 0001 31704>, r
+Page <Page Index 0036> of Process 026386 has been allocated in frame <Frame Index 4>!
+
+
+Process 1 unblocked! PID 26386
+
+P0, <HEX 0001ffd8> <DEC 0001 65496>, r
+(LFU) Page Process 03 lost a page (PAGE INDEX: 31d9) allocated in page frame 4!
+
+	Current Time: Mon Dec 11 23:54:04 2017
+
+
+
+(LFU) Page Process 01 lost a page (PAGE INDEX: 274) allocated in page frame 2!
+	Current Time: Mon Dec 11 23:54:04 2017
+
+
+
+P1, <HEX 00045ee0> <DEC 0004 24288>, w
+
+P0, <HEX 00017bd0> <DEC 0001 31696>, r
+(LFU Overwrite) Process 03 PageFault Penalty Time Interval: 1s
+
+
+P1, <HEX 00185ee0> <DEC 0024 24288>, w
+(LFU) Process 03 PageFault Penalty Time Interval: START TIME = 4s ; Duracao: 1s
+
+(LFU) Page Process 03 lost a page (PAGE INDEX: 20ab) allocated in page frame 1!
+
+
+
+Time Counter = 1
+
+Process 00 requires a page (PAGE INDEX <DEC 0003> <HEX 0003>) not framed in physical memory!
+
+
+	Current Time: Mon Dec 11 23:54:04 2017
+P1, <HEX 00185f00> <DEC 0024 24320>, w
+
+
+(LFU Overwrite) Process 00 PageFault Penalty Time Interval: 1s
+
+(LFU) Process 00 PageFault Penalty Time Interval: START TIME = 4s ; Duracao: 1s
+
+
+(LFU) Page Process 00 lost a page (PAGE INDEX: 31d9) allocated in page frame 4!
+P1, <HEX 00045f20> <DEC 0004 24352>, w
+
+
+Time Counter = 2
+
+
+P1, <HEX 00185f20> <DEC 0024 24352>, w
+
+
+Time Counter = 3
+
+
+P1, <HEX 00185f40> <DEC 0024 24384>, w
+
+
+Time Counter = 4
+
+
+P1, <HEX 00185f60> <DEC 0024 24416>, w
+
+
+Time Counter = 5
+
+
+P1, <HEX 00185f80> <DEC 0024 24448>, w
+
+
+Time Counter = 6
+
+
+
+
+P1, <HEX 00185fa0> <DEC 0024 24480>, w
+Time Counter = 7
+
+
+P1, <HEX 00185fc0> <DEC 0024 24512>, w
+
+
+Time Counter = 8
+
+
+
+
+P1, <HEX 00185fe0> <DEC 0024 24544>, w
+Time Counter = 9
+
+
+Process 01 requires a page (PAGE INDEX <DEC 4018> <HEX 0fb2>) not framed in physical memory!
+
+
+
+
+PageFault received!
+Time Counter = 10
+
+
+	Current Time: Mon Dec 11 23:54:04 2017
+
+
+(LFU Save Modified Page) Process 01 PageFault Penalty Time Interval: 2s
+
+(LFU) Process 01 PageFault Penalty Time Interval: START TIME = 4s ; Duracao: 2s
+
+(LFU) Page Process 01 lost a page (PAGE INDEX: 274) allocated in page frame 2!
+^C
+=============== End of Simulation: ===============
+
+	Current Time: Mon Dec 11 23:54:04 2017
+
+
+Process P0 removed!
+
+Process P1 removed!
+
+Process P2 removed!
+
+Process P3 removed!

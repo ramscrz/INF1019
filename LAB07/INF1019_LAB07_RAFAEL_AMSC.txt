@@ -1,0 +1,651 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Compile e Execute os códigos apresentados
+nos slides anteriores. Explicando os códigos
+e as diferenças entre FIFO com leitura/
+escrita bloqueante e não bloqueante.
+
+No seu relatório inclua os código de leitura e
+escrita bloqueante e não bloqueante. E as
+respectivas explicações dos códigos e
+diferenças.
+
+-----------------------------------------------------
+
+mkfifo.c
+
+#include<stdio.h>
+#include<sys/stat.h>
+
+int main (void) {
+
+   if(mkfifo("minhaFifo", S_IRUSR | S_IWUSR) == 0) {
+
+      puts("FIFO criada com sucesso");
+
+      return 0;
+   }
+
+   puts ("Erro na criação da FIFO");
+
+   return -1;
+}
+
+
+
+
+fifoWriter.c
+
+#include<stdio.h>
+#include<sys/stat.h>
+
+int main (void) {
+
+   FILE *pArq;
+
+   if ((pArq = fopen("minhaFifo", "w")) == NULL) {
+
+      puts ("Erro ao abrir a FIFO para escrita"); return -1;
+
+   }
+
+   fputs ("Melancia sem caroço", pArq);
+
+   fclose (pArq);
+   return 0;
+}
+
+
+
+
+fifoReader.c
+
+#include<stdio.h>
+#include<sys/stat.h>
+
+int main (void) {
+
+   FILE *pArq;
+   char ch;
+
+   if ((pArq = fopen("minhaFifo", "r")) == NULL) {
+
+      puts ("Erro ao abrir a FIFO para escrita"); return -1;
+   }
+
+   while ((ch = fgetc(pArq)) != EOF) putchar (ch);
+
+   fclose (pArq);
+   return 0;
+}
+
+
+
+
+fifoWriterNonBlock.c
+
+#include<unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include<fcntl.h>
+#include<string.h>
+
+#define OPENMODE (O_WRONLY | O_NONBLOCK)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char mensagem[] = "Melancia sem caroço";
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   puts ("Começando a escrever...");
+   write(fpFIFO, mensagem, strlen(mensagem));
+
+   puts ("Fim da escrita");
+   close (fpFIFO);
+
+   return 0;
+}
+
+
+
+
+fifoReaderNonBlock.c
+
+#include <unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include <fcntl.h>
+
+#define OPENMODE (O_RDONLY | O_NONBLOCK)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char ch;
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   puts ("Começando a ler...");
+
+   while (read (fpFIFO, &ch, sizeof(ch)) > 0)
+      putchar (ch);
+
+   puts ("Fim da leitura");
+   close (fpFIFO);
+
+   return 0;
+}
+
+
+
+
+fifoWriterBlock.c
+
+#include<unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include<fcntl.h>
+#include<string.h>
+
+#define OPENMODE (O_WRONLY)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char mensagem[] = "Melancia sem caroço";
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   puts ("Começando a escrever...");
+   write(fpFIFO, mensagem, strlen(mensagem));
+
+   puts ("Fim da escrita");
+   close (fpFIFO);
+
+   return 0;
+}
+
+
+
+fifoReaderBlock.c
+
+#include <unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include <fcntl.h>
+
+#define OPENMODE (O_RDONLY)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char ch;
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   puts ("Começando a ler...");
+
+   while (read (fpFIFO, &ch, sizeof(ch)) > 0)
+      putchar (ch);
+
+   puts ("Fim da leitura");
+   close (fpFIFO);
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o mkfifo.c mkfifo.c
+$ ./mkfifo
+
+$ gcc -o fifoWriter fifoWriter.c
+$ gcc -o fifoReader fifoReader.c
+$ ./fifoWriter
+(Outro terminal)
+$ ./fifoReader
+
+$ gcc -o fifoReaderNonBlock fifoReaderNonBlock.c
+$ gcc -o fifoWriterNonBlock fifoWriterNonBlock.c
+$ gcc -o fifoWriterBlock fifoWriterBlock.c
+$ gcc -o fifoReaderBlock fifoReaderBlock.c
+$ ./fifoReaderNonBlock
+$ ./fifoWriterNonBlock
+$ ./fifoReaderBlock
+$ ./fifoWriterBlock
+
+-----------------------------------------------------
+
+RESULTADO
+
+$ ./mkfifo
+
+araphawake$ ./mkfifo
+FIFO criada com sucesso
+araphawake$ ./mkfifo
+Erro na criação da FIFO
+araphawake$ ls -ls
+total 36
+20 -rw-rw-r-- 1 araphawake araphawake 16848 sept. 22 13:35 INF1019_LAB04_RAFAEL_AMSC.txt
+ 0 prw------- 1 araphawake araphawake     0 nov.   3 12:51 minhaFifo
+12 -rwxrwxr-x 1 araphawake araphawake  8656 nov.   3 12:50 mkfifo
+ 4 -rw-rw-r-- 1 araphawake araphawake   215 nov.   3 12:33 mkfifo.c
+
+// Outro teste
+
+// Terminal 1:
+
+$ ./fifoWriter
+
+// Terminal 2:
+
+$ ./fifoReader
+Melancia sem caroço
+
+// Outro teste
+
+$ ./fifoWriter &
+[1] 7344
+$ ./fifoWriter &
+[2] 7345
+$ ./fifoReader
+Melancia sem caroçoMelancia sem caroço[1]-  Done                    ./fifoWriter
+[2]+  Done                    ./fifoWriter
+
+// Outro teste
+
+$ ./fifoReader &
+[1] 7384
+$ ./fifoWriter
+Melancia sem caroço[1]+  Done                    ./fifoReader
+
+// Outro teste
+
+$ ./fifoWriterNonBlock 
+Abrindo FIFO
+Erro ao abrir a FIFO minhaFifo
+
+$ ./fifoReaderNonBlock 
+Abrindo FIFO
+Começando a ler...
+Fim da leitura
+
+$ ./fifoWriterBlock &
+[3] 8084
+Abrindo FIFO
+$ ./fifoReaderBlock
+Abrindo FIFO
+Começando a ler...
+Começando a escrever...
+Fim da escrita
+Melancia sem caroçoFim da leitura
+[3]+  Done                    ./fifoWriterBlock
+
+$ ./fifoWriterBlock &
+[1] 8095
+Abrindo FIFO
+$ ./fifoReaderNonBlock
+Abrindo FIFO
+Começando a ler...
+Fim da leitura
+Começando a escrever...
+
+./fifoReaderBlock &
+[1] 8311
+Abrindo FIFO
+./fifoWriterBlock
+Abrindo FIFO
+Começando a escrever...
+Começando a ler...
+Fim da escrita
+Melancia sem caroçoFim da leitura
+[1]+  Done                    ./fifoReaderBlock
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+OBS: FIFO = First In First Out, o primeiro dado escrito em uma FIFO é o primeiro a ser lido da FIFO.
+
+O primeiro módulo mkfifo.c implementa a criação de uma FIFO utilizando a função mkfifo com as flags S_IRUSR e S_IWUSR, indicando que a FIFO pode ser acessada tanto para escrita quanto para leitura. Caso a criação da FIFO falhe, o valor retornado é negativo e o programa retorna com uma mensagem de erro indicando que a FIFO não pode ser criada ou que já existe uma FIFO com o nome escolhido para a FIFO sendo criada.
+Após compilar e executar o programa, percebe-se que na primeira execução a FIFO é criada. Mas na segunda execução, a criação da FIFO falha porque já existe uma FIFO com o respectivo nome no diretório de execução, não sendo possível criar uma nova FIFO com o mesmo nome. A FIFO é um arquivo e portanto não pode existir duas FIFOs com o mesmo nome no mesmo diretório do sistema (senão a FIFO seria sobrescrita pela nova FIFO sendo criada).
+
+Em seguida, dois outros módulos foram criados, o fifoReader.c e o fifoWriter.c. Ambos módulos utilizam a função fopen para acessar a FIFO como um arquivo (a FIFO é um arquivo). O módulo fifoReader.c utiliza o argumento "r" para acessar a FIFO em modo leitura. O módulo fifoWriter.c utiliza o argumento "w" para acessar a FIFO em modo escrita. Portanto, os dois módulos acessam a FIFO como um arquivo e realizam operações de leitura e escrita no arquivo, o fifoReader faz a leitura e o fifoWriter faz a escrita. Dado que os arquivos são FIFOs, então o acesso de leitura e de escrita é por default um acesso que se comporta como se a FIFO tivesse sido aberta apenas com as flags O_RDONLY no caso da leitura e O_WRONLY no caso de escrita. Por isso, observa-se que o acesso à FIFO se comporta como um acesso de leitura ou escrita com bloqueio, isto é, o módulo fifoReader fica bloqueado até que outro processo acesse a FIFO no modo escrita e escreva na FIFO. O módulo fifoWriter fica bloqueado até que outro processo acesse a FIFO em modo leitura. Logo, a FIFO só é lida se estiver sendo acessada por um processo em modo escrita; ela só é escrita se estiver sendo acessada por um processo em modo leitura. Consequentemente, quando fifoReader é executada, o processo fica bloqueado esperando que a FIFO seja acessada por outro processo em modo escrita. Quando fifoWriter é executada, o processo fica bloqueado esperando que a FIFO seja acessada por outro processo em modo leitura. Isso foi observado com a execução de fifoReader e fifoWriter. Quando os dois processos acessam a FIFO, a fifoWriter escreve na FIFO e a fifoReader lê logo em seguida a mensagem escrita na FIFO pelo fifoWriter. Na execução, a fifoWriter escreve a mensage "melancia sem caroço" e a fifoReader lê a mensagem "melancia sem caroço". Nesse caso, as funções read e write são utilizadas para escrever e ler da FIFO, respectivamente.
+
+Porém, a FIFO também pode ser acessada, aberta, para leitura e para escrita sem utilizar a função fopen. No caso da leitura, a FIFO pode ser acessada e aberta através função open com a flag O_RDONLY. Se a leitura for sem bloqueio, então a flag O_NONBLOCK precisa também ser passada para a função open. Se a flag O_NONBLOCK não for passada à open, então a FIFO é aberta sem bloqueio. No caso da escrita, a FIFO pode ser acessada e aberta através da função open também, mas utilizando a flag O_WRONLY.
+
+O acesso à FIFO, tanto de leitura quanto de escrita, pode ser com bloqueio ou sem bloqueio. O bloqueio garante que o processo que lê da FIFO ficará pausado, à espera, até que um processo que escreva na mesma FIFO acesse a FIFO. E da mesma forma, garante que o processo que escreve na FIFO ficará pausado, à espera, até que um processo que leia da FIFO acesse a FIFO. Esse é o comportamento padrão do acesso à FIFO. A flag O_NONBLOCK indica que a FIFO será acessada para leitura ou para escrita independentemente de quais outros processos estão acessando a FIFO. Logo, se a FIFO estiver vazia, o processo que lê da FIFO sem bloqueio, irá ler nada e terminará a execução. Se a FIFO estiver cheia, o processo que lê da FIFO lê os dados da FIFO independentemente da existência de outros processos acessando essa mesma FIFO. No caso do processo que escreve na FIFO em modo O_NONBLOCK, ocorre um erro se a FIFO não estiver sendo acessada por algum outro processo em modo leitura e o processo falha em acessar a FIFO para escrita, terminando a sua execução. Isso também foi observado executando os módulos fifoReaderNonBlock.c e fifoWriterNonBlock.c.
+
+Os módulos fifoReaderBlock.c e fifoWriterBlock.c fazem o mesmo que os módulos fifoReaderNonBlock.c e fifoWriterNonBlock.c, porém não utilizam a flag O_NONBLOCK e se comportam como fifoReader.c e fifoWriter.c, isto é, com bloqueio. Só há leitura se a FIFO estiver sendo acessada para escrita; e só há escrita na FIFO se a FIFO estiver sendo acessada para leitura. Logo, se houver só leitor acessando a FIFO ou só escritor acessando a FIFO, o processo fica bloqueado até que tenha pelo menos um leitor e um escritor acessando a FIFO. Isso também pode ser observado na execução dos módulos mencionados. A fifoReaderBlock e a fifoReader.c conseguem ler da FIFO a mensagem "melancia sem caroço", escrita na FIFO pelo fifoWriterBlock e fifoWriter, respectivamente. 
+
+Se for executado fifoWriterBlock.c e depois fifoReaderNonBlock.c, quando fifoReaderNonBlock acessa a FIFO, ele lê antes que o fifoWriterBlock.c termine de escrever na FIFO e por isso fifoReaderNonBlock lê nada da FIFO (FIFO vazia). Se for executado fifoReaderBlock e depois fifoWriterNonBlock.c, a comunicação entre os módulos através da FIFO funciona porque a leitura fica esperando o término da escrita que é feita imediatamente pelo fifoWriterNonBlock, conforme mostrado nos resultados desse relatório. Isso ocorre porque o módulo fifoWriterBlock está bloqueado esperando o módulo fifoReaderNonBlock acessar a FIFO para leitura (mas a leitura deve ser apenas após a escrita, escrita e leitura ao mesmo tempo não é uma boa estratégia). Da mesma forma, o módulo fifoReaderBlock está bloqueado esperando o módulo fifoWriterNonBlock acessar a FIFO para escrita. Nesse caso fifoWriterNonBlock funciona porque a FIFO está sendo acessada pela fifoReaderBlock que aguarda o término da escrita de fifoWriterNonBlock na FIFO.
+
+-----------------------------------------------------
+
+QUESTÃO 2) Abra duas seções de terminais
+
+Na primeira, execute um programa que fica
+em loop lendo de uma FIFO para depois
+escrever na saída padrão (tela)
+
+Na segunda, execute um programa que fica
+lendo da entrada padrão (teclado) e depois
+escreve na mesma FIFO
+
+-----------------------------------------------------
+
+fifoWriterBlockLoop.c
+
+#include<unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include<fcntl.h>
+#include<string.h>
+
+#define OPENMODE (O_WRONLY)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char mensagem[101];
+
+   if(access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   while(1) {
+
+      if(fgets (mensagem, 100, stdin) != NULL) {
+         write(fpFIFO, mensagem, strlen(mensagem));
+      }
+
+   }
+
+   return 0;
+}
+
+
+
+fifoReaderBlockLoop.c
+
+#include <unistd.h>
+#include<stdio.h>
+#include<sys/stat.h>
+#include <fcntl.h>
+
+#define OPENMODE (O_RDONLY)
+#define FIFO "minhaFifo"
+
+int main (void) {
+
+   int fpFIFO;
+   char ch;
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   puts ("Abrindo FIFO");
+
+   if ((fpFIFO = open (FIFO, OPENMODE)) < 0) {
+      fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+      return -2;
+   }
+
+   while(1) {
+
+      if(read(fpFIFO, &ch, sizeof(ch)) > 0)
+         printf("%c", ch);
+
+   }
+
+   return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o fifoReaderBlockLoop fifoReaderBlockLoop.c
+$ gcc -o fifoWriterBlockLoop fifoWriterBlockLoop.c
+$ ./fifoWriterBlockLoop
+$ ./fifoReaderBlockLoop
+
+-----------------------------------------------------
+
+RESULTADO
+
+// Terminal 1
+
+$ ./fifoWriterBlockLoop
+Abrindo FIFO
+Kyou wa kinyoubi desu.
+Kinou wa mokuyoubi deshita.
+Ashita wa doyoubi desu.
+melancia sem caroço.
+
+// Terminal 2
+
+$ ./fifoReaderBlockLoop
+Abrindo FIFO
+Kyou wa kinyoubi desu.
+Kinou wa mokuyoubi deshita.
+Ashita wa doyoubi desu.
+melancia sem caroço.
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+Esse exercício é uma extensão de fifoReaderBlock.c e fifoWriterBlock.c, tal que o processo de leitura e o processo de escrita são executados separadamente cada um dentro de um loop. Portanto, há leitura e escrita constantes na FIFO. O módulo fifoWriterBlockLoop.c lê do teclado mensagens de texto (utilização de fgets) e escreve essa mensagem na FIFO utilizando a função write. O módulo fifoReaderBlockLoop.c lê as mensagens escritas na FIFO pelo módulo fifoWriterBlockLoop.c. Ambos os módulos acessam a FIFO em modo com bloqueio, então só há leitura na FIFO enquanto houver escrita na FIFO, e só há escrita na FIFO enquanto houver leitura na FIFO.
+
+A execução desses módulos compilados mostra que de fato que todas as entradas de textos do teclado lidas pela fifoWriterBlock são lidas em seguida por fifoReaderBlock, na ordem correta. Isso ocorre porque o ficheiro é acessado como uma FIFO, isto é, First In First Out, logo, o primeiro dado escrito na FIFO é o primeiro dado a lido da FIFO. Conforme as mensagens foram fornecidas como entrada de fifoWriterBlock ("Kyou wa kinyoubi desu.", por exemplo), o fifoReaderBlock leu as mensagens e imprimiu essas mensagens na tela do terminal. Ambos os módulos foram executados em diferentes janelas de Terminal. Assim a FIFO pode ser uma forma de comunicação entre processos, onde há o sincronismo do primeiro dado escrito na FIFO ser o primeiro dado a ser lido da FIFO.  
+-----------------------------------------------------
+
+QUESTÃO 3) Escreva um programa que primeiro cria uma
+FIFO e, em seguida, cria dois processos filho
+que escrevem cada um uma string na FIFO.
+
+O pai aguarda os filhos acabarem de
+escrever e em seguida lê as strings da FIFO
+e às exibe na tela.
+
+-----------------------------------------------------
+
+ex03.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<fcntl.h>
+#include<string.h>
+#include<sys/wait.h>
+
+#define FIFO "SuperFifo"
+
+int main (void) {
+
+   int fpFIFO, pid, npid;
+   char ch;
+   char mensagemOne[] = "Anata no namae wa, nan desu ka?\n";
+   char mensagemTwo[] = "Watashi wa Rafaeru to moushimasu.\n";
+
+   if (access(FIFO, F_OK) == -1) {
+
+      if (mkfifo(FIFO, S_IRUSR | S_IWUSR) != 0) {
+
+         fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+         return -1;
+      }
+   }
+
+   pid = fork();
+
+   if(pid > 0) {
+
+      if ((fpFIFO = open (FIFO, O_RDONLY)) < 0) {
+         fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+         return -2;
+      }
+
+      npid = fork();
+
+      if(npid > 0) {
+
+         waitpid(npid, 0, 0);
+
+      } else if(npid == 0) {
+
+         waitpid(pid, 0, 0);
+
+         if ((fpFIFO = open (FIFO, O_WRONLY)) < 0) {
+            fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+            return -2;
+         }
+
+         write(fpFIFO, mensagemTwo, strlen(mensagemTwo));
+
+         close (fpFIFO);
+
+         exit(0);
+
+      }
+
+      puts("Começando a ler...");
+
+      while(read(fpFIFO, &ch, sizeof(ch)) > 0)
+         printf("%c", ch);
+
+      puts ("Fim da leitura");
+      close (fpFIFO);
+
+   } else if(pid == 0) {
+
+      if ((fpFIFO = open (FIFO, O_WRONLY)) < 0) {
+         fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+         return -2;
+      }
+
+      write(fpFIFO, mensagemOne, strlen(mensagemOne));
+
+      close (fpFIFO);
+
+   }
+
+   return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex03.c ex03.c
+$ ./ex03
+
+-----------------------------------------------------
+
+RESULTADO
+
+$ ./ex03
+Começando a ler...
+Anata no namae wa, nan desu ka?
+Watashi wa Rafaeru to moushimasu.
+Fim da leitura
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+Novamente, a implementação de ex03.c é uma extensão da implementação de fifoReaderBlock.c e fifoWriterBlock.c, porém no caso a abertura da FIFO para a escrita é feita em dois filhos e a abertura da FIFO para leitura é feita pelo processo pai. Assim, o pai aguarda que os filhos escrevam na FIFO (waitpid foi utilizada para fazer o pai esperar o término do segundo processo filho a escrever na FIFO. O segundo processo filho a escrever na FIFO, aguarda que o primeiro processo filho a escrever na FIFO termine de ser executado. Assim, quando o processo pai saí da espera, ele já encontra as mensagens escritas pelos processos filhos na FIFO e consegue ler. A criação dos processos filhos foi feita através de fork(). A implementação/lógica de implementação da leitura e escrita na FIFO foi igual à implementação em fifoReaderBlock.c e fifoWriterBlock.c.
+
+O resultado é o processo pai ler da FIFO as mensagens escritas pelos filhos e imprimir primeiro a mensagem escrita pelo primeiro processo filho e depois a mensagem escrita pelo segundo filho, ou seja:
+
+"Anata no namae wa, nan desu ka?" => mensagem escrita pelo primeiro processo filho.
+"Watashi wa Rafaeru to moushimasu." => mensagem escrita pelo segundo filho.
+
+O resultado observado é exatamente como o esperado.
+
+-----------------------------------------------------
+

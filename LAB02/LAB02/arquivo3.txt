@@ -1,0 +1,48 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois 
+processos: processo pai e processo filho. 
+
+	Pai: Imprime “Processo pai iniciado”, o seu pid e
+	o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado". 
+	Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar 
+	imprime "Processo filho finalizado".
+
+DICA: Busque na internet o comando utilizado para obter o PID (process id) de um processo.
+
+
+ex04.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+      int status = 0;
+      pid_t parentpid = getpid();
+
+      pid_t pid = fork();
+
+      char* const parameters[] = {NULL};
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+            execv("alomundo", parameters);
+                waitpid(pid, &status, 0);
+                printf("Processo pai finalizado!\n\n");
+                exit(0);
+        } else {
+                // Child
+                printf("\tProcesso filho inicializado...\n");
+                printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+                execv("alomundo", parameters);
+            printf("\tProcesso filho finalizado!\n\n");
+                exit(0);
+        }
+
+        return 0;
+}

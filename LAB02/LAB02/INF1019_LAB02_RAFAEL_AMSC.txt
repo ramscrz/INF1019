@@ -1,0 +1,959 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Faça um programa para localizar determinado valor em um vetor de inteiros
+desordenado. O programa deve ser composto por no mínimo 4 processos filhos, em um mesmo nível, 
+que devem ser responsáveis por procurar o valor em uma parte do vetor cada. 
+Ao encontrar o valor, o processo deve imprimir:
+	Filho <PID> Encontrou na posição # do vetor.
+Caso o processo não encontre, deve imprimir:
+	Filho <PID> Não encontrou ocorrência do valor.
+
+Explique o funcionamento do seu código.
+
+-----------------------------------------------------
+
+ex01.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+pid_t multiSearchValue(int iter, int nchildren, int n, int* values, int value) {
+
+   int i = 0;
+   int start = 0;
+   int end = n;
+   int resto = 0;
+
+   if(iter > 0) {
+
+      pid_t parentpid = getpid();
+
+      pid_t pid = fork();
+
+      if(pid != 0) {
+
+         n = n - (n % nchildren);
+         multiSearchValue(iter - 1, nchildren, n, values, value);
+         waitpid(pid, 0, 0);
+      } else {
+         // Child
+         resto = n % nchildren;
+
+         start = n/nchildren * (iter - 1);
+         end = start + n/nchildren + resto;
+         printf("Filho < PID %d > de pai < PID %d > procurando valor %d entre posições %d e %d.\n",
+                  getpid(), parentpid, value, start, end - 1);
+
+         for(i = start; i < end; i++) {
+            if(values[i] == value) {
+               printf("Filho < PID %d > Encontrou na posição %d do vetor.\n", getpid(), i);
+            } else {
+               printf("Filho < PID %d > Não encontrou ocorrência do valor.\n", getpid());
+            }
+         }
+
+         printf("\tProcesso filho %d finalizado!\n\n", iter);
+         exit(0);
+      }
+   }
+
+}
+
+int main() {
+
+   int values[] = {1, 6, 5, 6, 3, 5, 6, -4, 5, 6, 2, 5, 100, 26, 6, 5};
+   int values2[] = {6, 2, 6, 1, 4};
+   int values3[] = {6, 2, 6, 1, 6, 4};
+   int values4[] = {6, 2, 6, 1, 6, 4, 6};
+   int values5[] = {6, 2, 6, 1, 6, 4, 6, 21};
+
+   printf("\n\n<< Primeiro teste >>\n\n");
+   multiSearchValue(4, 4, 16, values, 6);
+   printf("\n\n<< Segundo teste >>\n\n");
+   multiSearchValue(4, 4, 16, values, 5);
+   printf("\n\n<< Terceiro teste >>\n\n");
+   multiSearchValue(5, 5, 5, values2, 6);
+   printf("\n\n<< Quarto teste >>\n\n");
+   multiSearchValue(4, 4, 6, values3, 6);
+   printf("\n\n<< Quinto teste >>\n\n");
+   multiSearchValue(4, 4, 7, values4, 6);
+   printf("\n\n<< Sexto teste >>\n\n");
+   multiSearchValue(4, 4, 8, values5, 6);
+
+   return 0;
+
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc ex01.c -o ex01
+$ ./ex01
+
+-----------------------------------------------------
+
+RESULTADO
+
+<< Primeiro teste >>
+
+Filho < PID 14541 > de pai < PID 14540 > procurando valor 6 entre posições 12 e 15.
+Filho < PID 14541 > Não encontrou ocorrência do valor.
+Filho < PID 14541 > Não encontrou ocorrência do valor.
+Filho < PID 14541 > Encontrou na posição 14 do vetor.
+Filho < PID 14541 > Não encontrou ocorrência do valor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14542 > de pai < PID 14540 > procurando valor 6 entre posições 8 e 11.
+Filho < PID 14542 > Não encontrou ocorrência do valor.
+Filho < PID 14542 > Encontrou na posição 9 do vetor.
+Filho < PID 14542 > Não encontrou ocorrência do valor.
+Filho < PID 14542 > Não encontrou ocorrência do valor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14543 > de pai < PID 14540 > procurando valor 6 entre posições 4 e 7.
+Filho < PID 14543 > Não encontrou ocorrência do valor.
+Filho < PID 14543 > Não encontrou ocorrência do valor.
+Filho < PID 14543 > Encontrou na posição 6 do vetor.
+Filho < PID 14543 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+Filho < PID 14544 > de pai < PID 14540 > procurando valor 6 entre posições 0 e 3.
+Filho < PID 14544 > Não encontrou ocorrência do valor.
+Filho < PID 14544 > Encontrou na posição 1 do vetor.
+Filho < PID 14544 > Não encontrou ocorrência do valor.
+Filho < PID 14544 > Encontrou na posição 3 do vetor.
+	Processo filho 1 finalizado!
+
+
+
+<< Segundo teste >>
+
+Filho < PID 14545 > de pai < PID 14540 > procurando valor 5 entre posições 12 e 15.
+Filho < PID 14545 > Não encontrou ocorrência do valor.
+Filho < PID 14545 > Não encontrou ocorrência do valor.
+Filho < PID 14545 > Não encontrou ocorrência do valor.
+Filho < PID 14545 > Encontrou na posição 15 do vetor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14546 > de pai < PID 14540 > procurando valor 5 entre posições 8 e 11.
+Filho < PID 14546 > Encontrou na posição 8 do vetor.
+Filho < PID 14546 > Não encontrou ocorrência do valor.
+Filho < PID 14546 > Não encontrou ocorrência do valor.
+Filho < PID 14546 > Encontrou na posição 11 do vetor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14547 > de pai < PID 14540 > procurando valor 5 entre posições 4 e 7.
+Filho < PID 14547 > Não encontrou ocorrência do valor.
+Filho < PID 14547 > Encontrou na posição 5 do vetor.
+Filho < PID 14547 > Não encontrou ocorrência do valor.
+Filho < PID 14547 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+Filho < PID 14548 > de pai < PID 14540 > procurando valor 5 entre posições 0 e 3.
+Filho < PID 14548 > Não encontrou ocorrência do valor.
+Filho < PID 14548 > Não encontrou ocorrência do valor.
+Filho < PID 14548 > Encontrou na posição 2 do vetor.
+Filho < PID 14548 > Não encontrou ocorrência do valor.
+	Processo filho 1 finalizado!
+
+
+
+<< Terceiro teste >>
+
+Filho < PID 14549 > de pai < PID 14540 > procurando valor 6 entre posições 4 e 4.
+Filho < PID 14549 > Não encontrou ocorrência do valor.
+	Processo filho 5 finalizado!
+
+Filho < PID 14550 > de pai < PID 14540 > procurando valor 6 entre posições 3 e 3.
+Filho < PID 14550 > Não encontrou ocorrência do valor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14551 > de pai < PID 14540 > procurando valor 6 entre posições 2 e 2.
+Filho < PID 14551 > Encontrou na posição 2 do vetor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14552 > de pai < PID 14540 > procurando valor 6 entre posições 1 e 1.
+Filho < PID 14552 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+Filho < PID 14553 > de pai < PID 14540 > procurando valor 6 entre posições 0 e 0.
+Filho < PID 14553 > Encontrou na posição 0 do vetor.
+	Processo filho 1 finalizado!
+
+
+
+<< Quarto teste >>
+
+Filho < PID 14554 > de pai < PID 14540 > procurando valor 6 entre posições 3 e 5.
+Filho < PID 14554 > Não encontrou ocorrência do valor.
+Filho < PID 14554 > Encontrou na posição 4 do vetor.
+Filho < PID 14554 > Não encontrou ocorrência do valor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14555 > de pai < PID 14540 > procurando valor 6 entre posições 2 e 2.
+Filho < PID 14555 > Encontrou na posição 2 do vetor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14557 > de pai < PID 14540 > procurando valor 6 entre posições 0 e 0.
+Filho < PID 14557 > Encontrou na posição 0 do vetor.
+	Processo filho 1 finalizado!
+
+Filho < PID 14556 > de pai < PID 14540 > procurando valor 6 entre posições 1 e 1.
+Filho < PID 14556 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+
+
+<< Quinto teste >>
+
+Filho < PID 14558 > de pai < PID 14540 > procurando valor 6 entre posições 3 e 6.
+Filho < PID 14558 > Não encontrou ocorrência do valor.
+Filho < PID 14559 > de pai < PID 14540 > procurando valor 6 entre posições 2 e 2.
+Filho < PID 14558 > Encontrou na posição 4 do vetor.
+Filho < PID 14559 > Encontrou na posição 2 do vetor.
+Filho < PID 14558 > Não encontrou ocorrência do valor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14558 > Encontrou na posição 6 do vetor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14560 > de pai < PID 14540 > procurando valor 6 entre posições 1 e 1.
+Filho < PID 14560 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+Filho < PID 14561 > de pai < PID 14540 > procurando valor 6 entre posições 0 e 0.
+Filho < PID 14561 > Encontrou na posição 0 do vetor.
+	Processo filho 1 finalizado!
+
+
+
+<< Sexto teste >>
+
+Filho < PID 14562 > de pai < PID 14540 > procurando valor 6 entre posições 6 e 7.
+Filho < PID 14562 > Encontrou na posição 6 do vetor.
+Filho < PID 14562 > Não encontrou ocorrência do valor.
+	Processo filho 4 finalizado!
+
+Filho < PID 14563 > de pai < PID 14540 > procurando valor 6 entre posições 4 e 5.
+Filho < PID 14563 > Encontrou na posição 4 do vetor.
+Filho < PID 14563 > Não encontrou ocorrência do valor.
+	Processo filho 3 finalizado!
+
+Filho < PID 14564 > de pai < PID 14540 > procurando valor 6 entre posições 2 e 3.
+Filho < PID 14564 > Encontrou na posição 2 do vetor.
+Filho < PID 14564 > Não encontrou ocorrência do valor.
+	Processo filho 2 finalizado!
+
+Filho < PID 14565 > de pai < PID 14540 > procurando valor 6 entre posições 0 e 1.
+Filho < PID 14565 > Encontrou na posição 0 do vetor.
+Filho < PID 14565 > Não encontrou ocorrência do valor.
+	Processo filho 1 finalizado!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função multiSearchValue recursiva que recebe o número inteiro iter de processos filhos que ainda devem ser criados para tratar de uma das pares do vetor de entrada e o número total de partes em que o vetor será dividido de modo que cada parte seja tratada por um processo filho. 
+
+Essa função implementa o pedido no exercício de forma genérica, isto é, o vetor de entrada pode ser dividido em nchildren partes, cada parte sendo tratada por um dos nchildren processos filhos. Após a chamada de fork() com a criação de um processo filho, dentro do escopo do processo pai essa função é chamada novamente enquanto ainda houver filhos a serem criados e partes do vetor a serem tratadas. Assim a chamada recursiva da função recebe a cada chamada o valor iter - 1, com o valor de iter atualizado para o número de processos filhos que ainda devem ser criados.
+
+O vetor é divido em nchildren partes de igual tamanho caso o vetor tenha um número de valores múltiplo de nchildren. Caso contrário, a última parte do vetor fica com os elementos excedentes (identificados pela operação |v|%nchildren).
+
+Sempre que a função é chamada recursivamente no escopo do processo pai, após a chamada de fork(), um novo filho é criado. Ao fim das chamadas recursivas, nchildren terão sido criados com o mesmo processo pai. O resultado da execução do programa demonstra isso, tanto o fato dos filhos terem o mesmo processo pai quanto as partições do vetor de entrada.
+
+O terceiro teste divide o vetor de entrada em 5 partições e cada partição é tratada por um processo diferente, todos filhos do mesmo processo pai.
+
+Os testes seguintes usam vetores de entrada com um número de elementos não múltiplo do número de partições, logo de processos filhos, a serem criadas. Podemos observar que uma das partições é maior que as demais para lidar com os elementos excedentes, afinal não é possível nchildren partições de igual tamanho nesse caso.
+
+O processo pai sempre espera a execução de todos os seus filhos terminar para continuar executando (devido a chamada waitpid(pid, 0, 0)).
+
+-----------------------------------------------------
+
+QUESTÃO 2) Faça um programa que deve realizar a soma de 2 matrizes 3 X 3. O programa
+deve ser estruturado em no mínimo 3 processos que fazem a soma de cada linha
+da matriz. Cada processo exibe, ao terminar a soma, os valores para a linha da
+matriz. Atenção para exibir as linhas na ordem correta. Explique o funcionamento
+do seu código. Explique como você controla a exibição de cada linha da matriz na
+ordem correta.
+
+-----------------------------------------------------
+
+ex02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+static void printMatrix(int rows, int cols, double M[rows][cols]) {
+
+   int r, c = 0;
+
+   for(r = 0; r < rows; r++) {
+      printf("\n| ");
+      for(c = 0; c < cols - 1; c++) {
+         printf("\t %.5f", M[r][c]);
+      }
+      printf("\t %.5f \t|", M[r][c]);
+   }
+
+}
+
+
+static void somaMatrizes(int row, int col, double A[][col], double B[][col]) {
+
+   int i = 0;
+   int sum = 0;
+   pid_t pidparent = getpid();
+   pid_t pid = 0;
+
+   row -= 1;
+
+   if(row >= 0) {
+
+      pid = fork();
+
+      if(pid != 0) {
+         // Parent
+         waitpid(pid, 0, 0);
+      } else {
+         // Child
+         somaMatrizes(row, col, A, B);
+         printf("\nFILHO <PID %d> de PAI <PID %d>: Resultado da Matriz Soma LINHA %d :\n | ", getpid(), pidparent, row);
+         for(i = 0; i < col; i++) {
+            printf("\t %.5f", A[row][i] + B[row][i]);
+         }
+         printf("\t|\n");
+         exit(0);
+      }
+   }
+}
+
+int main() {
+
+   double M[][3] = {{1, 3.9, 2}, {2, -3, 2.5}, {90, -11, 3.6}};
+
+   double N[][3] = {{23, -45, 8.2}, {2, 6, 2.9}, {-9.5, 34, 83.5}};
+
+   double A[][4] = {{1, 3.9, 2, 5}, {2, -3, 2.5, 5.4}, {-8, 11, 16.7, -52}, {90, -11, 3.6, 22}};
+
+   double B[][4] = {{23, -45, 8.2, 75.5}, {2, 6, 2.9, 3}, {-8.9, 1.1, 167, -5.2}, {-9.5, 34, 83.5, 11}};
+
+   double C[][4] = {{10, 10, 10, 10}, {10, 10, 10, 10}, {10, 10, 10, 10}, {10, 10, 10, 10}};
+
+   double D[][4] = {{1, 1, 1, 1}, {1, 1, 1, 1}, {1, 1, 1, 1}, {1, 1, 1, 1}};
+
+   printMatrix(3, 3, M);
+   printf("\n\n + \n\n");
+   printMatrix(3, 3, N);
+   printf("\n\n");
+   somaMatrizes(3, 3, M, N);
+
+   printf("\n\n");
+   printMatrix(4, 4, C);
+   printf("\n\n + \n\n");
+   printMatrix(4, 4, C);
+   printf("\n\n");
+   somaMatrizes(4, 4, C, C);
+
+   printf("\n\n");
+   printMatrix(4, 4, D);
+   printf("\n\n + \n\n");
+   printMatrix(4, 4, C);
+   printf("\n\n");
+   somaMatrizes(4, 4, D, C);
+
+   printf("\n\n");
+   printMatrix(4, 4, A);
+   printf("\n\n + \n\n");
+   printMatrix(4, 4, B);
+   printf("\n\n");
+   somaMatrizes(4, 4, A, B);
+   printf("\n\n");
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc ex02.c -o ex02
+$ ./ex02
+
+-----------------------------------------------------
+
+RESULTADO
+
+| 	 1.00000	 3.90000	 2.00000 	|
+| 	 2.00000	 -3.00000	 2.50000 	|
+| 	 90.00000	 -11.00000	 3.60000 	|
+
+ + 
+
+
+| 	 23.00000	 -45.00000	 8.20000 	|
+| 	 2.00000	 6.00000	 2.90000 	|
+| 	 -9.50000	 34.00000	 83.50000 	|
+
+
+FILHO <PID 14576> de PAI <PID 14575>: Resultado da Matriz Soma LINHA 0 :
+ | 	 24.00000	 -41.10000	 10.20000	|
+
+FILHO <PID 14575> de PAI <PID 14574>: Resultado da Matriz Soma LINHA 1 :
+ | 	 4.00000	 3.00000	 5.40000	|
+
+FILHO <PID 14574> de PAI <PID 14573>: Resultado da Matriz Soma LINHA 2 :
+ | 	 80.50000	 23.00000	 87.10000	|
+
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+ + 
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+
+FILHO <PID 14580> de PAI <PID 14579>: Resultado da Matriz Soma LINHA 0 :
+ | 	 20.00000	 20.00000	 20.00000	 20.00000	|
+
+FILHO <PID 14579> de PAI <PID 14578>: Resultado da Matriz Soma LINHA 1 :
+ | 	 20.00000	 20.00000	 20.00000	 20.00000	|
+
+FILHO <PID 14578> de PAI <PID 14577>: Resultado da Matriz Soma LINHA 2 :
+ | 	 20.00000	 20.00000	 20.00000	 20.00000	|
+
+FILHO <PID 14577> de PAI <PID 14573>: Resultado da Matriz Soma LINHA 3 :
+ | 	 20.00000	 20.00000	 20.00000	 20.00000	|
+
+
+
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+| 	 1.00000	 1.00000	 1.00000	 1.00000 	|
+
+ + 
+
+
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+| 	 10.00000	 10.00000	 10.00000	 10.00000 	|
+
+
+FILHO <PID 14584> de PAI <PID 14583>: Resultado da Matriz Soma LINHA 0 :
+ | 	 11.00000	 11.00000	 11.00000	 11.00000	|
+
+FILHO <PID 14583> de PAI <PID 14582>: Resultado da Matriz Soma LINHA 1 :
+ | 	 11.00000	 11.00000	 11.00000	 11.00000	|
+
+FILHO <PID 14582> de PAI <PID 14581>: Resultado da Matriz Soma LINHA 2 :
+ | 	 11.00000	 11.00000	 11.00000	 11.00000	|
+
+FILHO <PID 14581> de PAI <PID 14573>: Resultado da Matriz Soma LINHA 3 :
+ | 	 11.00000	 11.00000	 11.00000	 11.00000	|
+
+
+
+| 	 1.00000	 3.90000	 2.00000	 5.00000 	|
+| 	 2.00000	 -3.00000	 2.50000	 5.40000 	|
+| 	 -8.00000	 11.00000	 16.70000	 -52.00000 	|
+| 	 90.00000	 -11.00000	 3.60000	 22.00000 	|
+
+ + 
+
+
+| 	 23.00000	 -45.00000	 8.20000	 75.50000 	|
+| 	 2.00000	 6.00000	 2.90000	 3.00000 	|
+| 	 -8.90000	 1.10000	 167.00000	 -5.20000 	|
+| 	 -9.50000	 34.00000	 83.50000	 11.00000 	|
+
+
+FILHO <PID 14588> de PAI <PID 14587>: Resultado da Matriz Soma LINHA 0 :
+ | 	 24.00000	 -41.10000	 10.20000	 80.50000	|
+
+FILHO <PID 14587> de PAI <PID 14586>: Resultado da Matriz Soma LINHA 1 :
+ | 	 4.00000	 3.00000	 5.40000	 8.40000	|
+
+FILHO <PID 14586> de PAI <PID 14585>: Resultado da Matriz Soma LINHA 2 :
+ | 	 -16.90000	 12.10000	 183.70000	 -57.20000	|
+
+FILHO <PID 14585> de PAI <PID 14573>: Resultado da Matriz Soma LINHA 3 :
+ | 	 80.50000	 23.00000	 87.10000	 33.00000	|
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código fonte possui a função main e mais duas funções. A função printMatrix imprime matrizes e foi implementada para imprimir os resultados de forma que os torne mais facilmente legíveis. A função somaMatrizes é uma implementação recursiva de um algoritmo que atribui a soma de cada linha de duas matrizes a um processo filho de um processo pai de modo que o resultado da soma da primeira linha seja impresso antes do resultado da soma da segunda linha, isto é, os resultados são impressos de acordo com a ordem crescente do número da linha. Para um processo W que faz a soma das linhas da posição x da matriz, um novo processo filho Z é criado para realizar a soma das linhas da posição x - 1 da matriz. O processo W espera o término do processo filho Z para imprimir a soma das linhas da sua posição de linha na matriz. Assim, o resultado da soma referente à linha 1 é impresso primeiro, em seguido o resultado da linha 2 e assim por diante até o resultado referente à última linha das matrizes A e B de entrada. Logo, processos de diferentes níveis (todo processo tem um filho exatamente) permitem a impressão do resultado das linhas em ordem.
+
+Novamente, essa implementação é genérica e permite aplicar o algoritmo para matrizes quadradas de qualquer dimensão N x N. Os testes realizados na main podem ser visualizados em Resultados. Os testes são bastante claros, sendo impressas as matrizes a serem somadas e também o respectivo resultado abaixo delas. Os testes feitos incluem somas para matrizes 3x3 mas também para matrizes maiores que 3x3.
+
+
+-----------------------------------------------------
+
+QUESTÃO 3) Faça um programa que simule a SHELL, ou seja, o programa fica aguardando comandos, ao receber um comando, o processo pai se duplica e designa a execução do comando ao filho. Quando o filho acaba de executar, o pai volta a esperar um novo comando.
+
+	a) Teste para os seguintes comandos:
+		ls - Lista os arquivos/diretórios do diretório corrente
+		ps - exibe os processos que estão executando no momento
+		pwd - exibe o diretório atual
+
+	O seu programa deve permitir a execução de comandos com argumentos.
+			
+	b) Teste para os seguintes comandos:
+			echo "Escreva uma mensagem aqui" - exibe a mensagem entre aspas
+			cat "nome de um arquivo" - exibe o contéudo do arquivo cujo nome é
+												passado no parâmetro
+			grep "palavra" "nome de um arquivo" - exibe as ocorrências da palavra
+												dentro do arquivo informado
+
+	c) Escreva um programa qualquer, compile-o e utilize o programa SHELL para
+	executá-lo.
+
+Explique o funcionamento do seu código. 
+
+-----------------------------------------------------
+
+teste03.c
+
+#include<stdio.h>
+
+int main() {
+
+   int i = 0;
+   char * japanNumbers[20] = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+                            "十一", "十二", "十三", "十四", "十五", "十六", "十七",
+                            "十八", "十九", "二十"};
+
+   printf("\n\nPrograma executado a partir de outro programa de comandos SHELL.\n\n");
+
+   for(i = 0; i < 20; i++) {
+
+      printf("\t\t\t %s \t %d \n", japanNumbers[i], i+1);
+
+   }
+
+   printf("\n\n");
+
+   return 0;
+}
+
+
+ex03.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include <string.h>
+
+char** parseCommand(char * input, char delimiter) {
+
+   int i, k = 0;
+   int j = 2;
+   int inputSize = strlen(input) + 1;
+   char currentpath[1024];
+   char** result = (char**) malloc (inputSize * sizeof(char*));
+
+   for(i = 0; i < inputSize; i++) {
+      result[i] = (char*) malloc (1024 * sizeof(char));
+   }
+
+   i = 0;
+
+   // Loads the filename of the program to be executed.
+   strcpy(result[0], "sh");
+   strcpy(result[1], "-c");
+
+   // Parses the input string of the command.
+   while(input[i]) {
+
+      // In case ' ' is found, then every character before different than whitespace 
+      // belongs to the same word which is one argument of the command to be executed.
+      if(input[i] == ' ') {
+
+         // If the character that follows is not ("), then this parameter is done. 
+         // Otherwise, this parameter must include the following characters until another (") 
+         // is found; j is the index of the parameter of the parsed command.
+         if(input[i+1] != '\"') {
+            j++;
+            k = 0;
+         } else {
+
+            result[j][k] = ' ';
+            k++;
+         }
+      // If input[i] is ", then every character after input[i] until the next " must belong 
+      // to the same parameter.
+      } else if(input[i] == '\"') {
+
+         i++;
+         while(input[i] && input[i] != '\"') {
+            result[j][k] = input[i];
+            i++;
+            k++;
+         }
+
+         if(input[i+2] != '\"') {
+            j++;
+            k = 0;
+         } else {
+            result[j][k] = ' ';
+            k++;
+				i++;
+         }
+
+      } else {
+         // Saves the character input[i] as part of the parameter result[j];
+         // i allows iteration over the characters of input.
+         // j allows iteration over the parameters of the command.
+         result[j][k] = input[i];
+         k++;
+      }
+
+      i++;
+   }
+
+   // The last character of the array of chars used to indicate the parameters to execvp function 
+   // must be NULL.
+   result[j + 1] = NULL;
+
+   return result;
+
+}
+
+int main() {
+
+   char input[1024];
+   char ** command;
+   char currentpath[1024];
+   char * exitC[] = {"sh", "-c", "exit", NULL};
+   pid_t pid;
+
+   if(getcwd(currentpath, sizeof(currentpath)) == NULL) {
+      strcpy(currentpath, "~ ");
+   }
+
+   printf("\nRunning from directory: \n%s \n\nEnter command: ", currentpath);
+   fgets(input, 1024, stdin);
+   printf("\n\n");
+
+   while(strcmp(input, "exit\n") != 0) {
+
+      pid = fork();
+
+      if(pid != 0) {
+
+         waitpid(pid, 0, 0);
+
+      } else {
+
+         command = parseCommand(input, ' ');
+
+         execvp(command[0], command);
+         exit(0);
+      }
+
+      if(getcwd(currentpath, sizeof(currentpath)) == NULL) {
+         strcpy(currentpath, "~ ");
+      }
+
+      printf("\nRunning from directory: \n%s \n\nEnter command: ", currentpath);
+      fgets(input, 1024, stdin);
+   }
+
+   pid = fork();
+
+   if(pid != 0) {
+
+         waitpid(pid, 0, 0);
+
+   } else {
+      execvp(exitC[0], exitC);
+   }
+
+   return 0;
+
+}
+
+-----------------------------------------------------
+
+arquivo3.txt
+
+LUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois
+processos: processo pai e processo filho.
+
+   Pai: Imprime “Processo pai iniciado”, o seu pid e
+   o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado".
+   Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar
+   imprime "Processo filho finalizado".
+
+DICA: Busque na internet o comando utilizado para obter o PID (process id) de um processo.
+
+
+ex04.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+      int status = 0;
+      pid_t parentpid = getpid();
+
+      pid_t pid = fork();
+
+      char* const parameters[] = {NULL};
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+            execv("alomundo", parameters);
+                waitpid(pid, &status, 0);
+                printf("Processo pai finalizado!\n\n");
+                exit(0);
+        } else {
+                // Child
+                printf("\tProcesso filho inicializado...\n");
+                printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+                execv("alomundo", parameters);
+            printf("\tProcesso filho finalizado!\n\n");
+                exit(0);
+        }
+
+        return 0;
+}
+
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc teste03.c -o teste03
+$ ./teste03
+$ gcc ex03.c -o ex03
+$ ./ex03
+
+-----------------------------------------------------
+
+RESULTADO
+
+./teste03
+
+Programa executado a partir de outro programa de comandos SHELL.
+
+			 一 	 	 1 
+			 二 	 	 2 
+			 三 	 	 3 
+			 四 	 	 4 
+			 五 	 	 5 
+			 六 	 	 6 
+			 七 	 	 7 
+			 八 	 	 8 
+			 九 	 	 9 
+			 十 	 	 10 
+			 十一 	 11 
+			 十二 	 12 
+			 十三 	 13 
+			 十四 	 14 
+			 十五 	 15 
+			 十六 	 16 
+			 十七 	 17 
+			 十八 	 18 
+			 十九 	 19 
+			 二十 	 20 
+
+
+
+./ex03
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: ls
+
+
+ex01	ex02	ex03	INF1019_Lab2_ComunicaçãoentreProcessos-fork-20172.pdf  teste03	  teste.txt
+ex01.c	ex02.c	ex03.c	teste						       teste03.c
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: ps
+  PID TTY          TIME CMD
+ 3754 pts/1    00:00:00 bash
+14630 pts/1    00:00:00 ex03
+14646 pts/1    00:00:00 sh
+14647 pts/1    00:00:00 ps
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: pwd
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: echo "Hello world!"
+Hello world!
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: cat "arquivo3.txt"                         
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois 
+processos: processo pai e processo filho. 
+
+	Pai: Imprime “Processo pai iniciado”, o seu pid e
+	o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado". 
+	Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar 
+	imprime "Processo filho finalizado".
+
+DICA: Busque na internet o comando utilizado para obter o PID (process id) de um processo.
+
+
+ex04.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+int main() {
+
+      int status = 0;
+      pid_t parentpid = getpid();
+
+      pid_t pid = fork();
+
+      char* const parameters[] = {NULL};
+
+        if(pid != 0) {
+                // Parent
+                printf("\nProcesso pai inicializado...\n");
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+            execv("alomundo", parameters);
+                waitpid(pid, &status, 0);
+                printf("Processo pai finalizado!\n\n");
+                exit(0);
+        } else {
+                // Child
+                printf("\tProcesso filho inicializado...\n");
+                printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+                execv("alomundo", parameters);
+            printf("\tProcesso filho finalizado!\n\n");
+                exit(0);
+        }
+
+        return 0;
+}
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: grep "processo" "arquivo3.txt"
+processos: processo pai e processo filho. 
+DICA: Busque na internet o comando utilizado para obter o PID (process id) de um processo.
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: grep "pai" "arquivo3.txt"
+processos: processo pai e processo filho. 
+	Pai: Imprime “Processo pai iniciado”, o seu pid e
+	o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado". 
+	Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar 
+                printf("\nProcesso pai inicializado...\n");
+                printf("Processo pai finalizado!\n\n");
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: grep "pid" "arquivo3.txt"
+QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois 
+	Pai: Imprime “Processo pai iniciado”, o seu pid e
+	o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado". 
+	Filho: Imprime “Processo  filho  iniciado”, o seu pid, o pid do seu pai, e ao terminar 
+      pid_t parentpid = getpid();
+      pid_t pid = fork();
+        if(pid != 0) {
+                printf("pid: %d \t pid(child): %d\n\n", parentpid, pid);
+                waitpid(pid, &status, 0);
+                printf("\tpid: %d \t pid(parent): %d\n", getpid(), parentpid);
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: ./teste03
+
+
+Programa executado a partir de outro programa de comandos SHELL.
+
+			 一 	 1 
+			 二 	 2 
+			 三 	 3 
+			 四 	 4 
+			 五 	 5 
+			 六 	 6 
+			 七 	 7 
+			 八 	 8 
+			 九 	 9 
+			 十 	 10 
+			 十一 	 11 
+			 十二 	 12 
+			 十三 	 13 
+			 十四 	 14 
+			 十五 	 15 
+			 十六 	 16 
+			 十七 	 17 
+			 十八 	 18 
+			 十九 	 19 
+			 二十 	 20 
+
+
+
+Running from directory: 
+/home/araphawake/Documents/PUC_RIO/SisComp/LAB02/LAB02_SISCOMP 
+
+Enter command: exit
+
+
+-----------------------------------------------------
+
+CONCLUSÂO
+
+O código fonte do arquivo teste03.c possui a implementação de uma função main que apenas imprime uma frase e depois imprime a contagem dos números de 1 a 20 em japonês, escritos em kanji.
+
+O código fonte do arquivo ex03.c implementa uma função parseCommand que utiliza o delimitador ' ', passado por parâmetro na chaamada na main, para obter os tokens da string de entrada input (comando de entrada do usuário do programa) que constituem os parâmetros e informações do comando a ser executado pela shell do linux. Esses tokens são guardados em um vetor de strings result na ordem em que aparecem na string de entrada input de modo que result seja um array de parâmetros e informações válido como parâmetro da função execvp. A função execvp recebe o nome do programa que deve ser executado e o array result com os parâmetros de execução do programa. O array result deve ter na primeira posição o nome do programa a ser executado, na segunda posição "-c" e nas posições seguintes os parâmetros, tal que a última posição de result teha NULL indicando o término da lista de parâmetros a serem usados pelo programa na execução pela shell.
+
+fgets foi utilizada para a E/S, garantindo pegar toda a string incluindo espaços em branco.
+
+O simples parser implementado trata de texto entre aspas da string de entrada input, dado que esse texto deve ser todo incluído no token anterior como um só valor de result. O excvp recebe o nome do arquivo do programa a ser executado e um vetor de parâmetros do programa (vetor de strings). O "v" em excvp indica que a função recebe um array de char* como parâmetros do programa. E o "p" indica que a função busca o arquivo executável na environment path variable. Caso fosse usada a execl, os parâmetros teriam que ser fornecidos separadamente/individualmente.
+
+A waitpid é utilizada para fazer o processo pai aguardar que o processo filho criado pelo fork() termine de executar o comando requisitado pelo usuário. Quando o filho termine de executar, o pai volta a ser executado e volta a aguardar um novo comando do usuário. O processo pai repete esse procedimento dentro de um while com condição de parada definida pela recepção do comando "exit" que deve ser o último comando executado no programa por um processo filho.
+-----------------------------------------------------
+

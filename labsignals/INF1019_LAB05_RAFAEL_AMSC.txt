@@ -1,0 +1,2099 @@
+ALUNORAFAELCRUZ - 1221020
+
+QUESTÃO 1) Faça um programa que crie 2 processos filho e alterne a execução dos filhos. Após 10 trocas
+de contexto, o processo pai mata os processos filho.
+OBS: Os processos filho são formados por loops eternos.
+
+-----------------------------------------------------
+
+ex01.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<signal.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+#define TIME 3
+
+// flags
+int turn = 1;
+int changes = 0;
+
+// pid of the children (processes)
+pid_t pidOne = 0, pidTwo = 0;
+
+void changeContext(int signal) {
+
+   if(changes == 10) {
+
+      printf("\n\n======== Contexto foi trocado 10 vezes! ========\n\n");
+
+      kill(pidOne, SIGKILL);
+      kill(pidTwo, SIGKILL);
+
+			return;
+
+   } else {
+
+      if(turn == 1) {
+         kill(pidOne, SIGSTOP);
+         printf("\n=== Change from process PID<%d> to process PID<%d>\n", pidOne, pidTwo);
+         kill(pidTwo, SIGCONT);
+         turn = 2;
+      } else if(turn == 2) {
+         kill(pidTwo, SIGSTOP);
+         printf("\n=== Change from process PID<%d> to process PID<%d>\n", pidTwo, pidOne);
+         kill(pidOne, SIGCONT);
+         turn = 1;
+      } else {
+         turn = 1;
+         kill(pidTwo, SIGSTOP);
+         kill(pidOne, SIGCONT);
+      }
+   }
+
+   alarm(TIME);
+
+   changes++;
+
+	 return;
+
+}
+
+int main() {
+
+   signal(SIGALRM, changeContext);
+
+   pid_t pid = 0;
+
+   pid = fork();
+
+   if(pid < 0) {
+
+      printf("\n\nfork() call error!\n\n");
+
+      exit(1);
+
+   } else if(pid > 0) {
+
+      pidOne = pid;
+
+      pid = fork();
+
+      if(pid < 0) {
+
+         printf("\n\nfork() call error!\n\n");
+
+         exit(1);
+
+      } else if(pid > 0) {
+
+         pidTwo = pid;
+
+         alarm(TIME);
+
+         waitpid(pidOne, 0, 0);
+         waitpid(pidTwo, 0, 0);
+
+      } else {
+
+         kill(getpid(), SIGSTOP);
+
+         while(1) {
+            printf("\n\tProcesso 2 sendo executado!\n");
+            sleep(TIME + 1);
+         }
+
+         exit(0);
+      }
+
+   } else {
+
+      while(1) {
+         printf("\nProcesso 1 sendo executado!\n");
+         sleep(TIME + 1);
+      }
+
+      exit(0);
+
+   }
+
+   return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex ex01.c
+$ ./ex
+
+-----------------------------------------------------
+
+RESULTADO
+
+Processo 1 sendo executado!
+
+=== Change from process PID<5797> to process PID<5798>
+
+	Processo 2 sendo executado!
+
+=== Change from process PID<5798> to process PID<5797>
+
+Processo 1 sendo executado!
+
+=== Change from process PID<5797> to process PID<5798>
+
+	Processo 2 sendo executado!
+
+=== Change from process PID<5798> to process PID<5797>
+
+Processo 1 sendo executado!
+
+=== Change from process PID<5797> to process PID<5798>
+
+	Processo 2 sendo executado!
+
+=== Change from process PID<5798> to process PID<5797>
+
+Processo 1 sendo executado!
+
+=== Change from process PID<5797> to process PID<5798>
+
+	Processo 2 sendo executado!
+
+=== Change from process PID<5798> to process PID<5797>
+
+Processo 1 sendo executado!
+
+=== Change from process PID<5797> to process PID<5798>
+
+	Processo 2 sendo executado!
+
+=== Change from process PID<5798> to process PID<5797>
+
+Processo 1 sendo executado!
+
+
+======== Contexto foi trocado 10 vezes! ========
+
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função changeContext que é utilizada para tratar o sinal SIGALRM.
+A chamada signal(SIGALRM, changeContext) determina que o processo pai (onde a chamada da função ocorre) utiliza a função changeContext para tratar o sinal SIGALRM. O código cria dois processos filhos utilizando fork(). Os processos filhos criados por fork() herdam a função changeContext como tratador do sinal ALRM.
+O objetivo do código é utilizar o sinal SIGALRM como um temporizador que alterna os processos(contextos) sendo executados pela CPU. Toda vez que ocorre o sinal SIGALRM, a função changeContext é executada, verificando se já houve 10 trocas de contexto(troca de processo sendo executado pela CPU) e caso ainda não tenha ocorrido pelo menos 10 trocas de contexto, a função utiliza a variável global turn para determinar qual processo deve ser executado e qual o processo sendo executado atualmente e que deve ser pausado. Portanto, a função changeContext utiliza kill(pidProcesso, SIGCONT), onde pidProcesso é o pid do processo não sendo executado atualmente pela CPU; e kill(pidProcesso, SIGSTOP) onde pidProcesso é o pid do processo sendo executado e que deve ser pausado para que o outro processo seja executado.
+Portanto, há 4 variáveis globais: turn que armazena 1 ou 2 indicando o processo em execução na CPU; changes que armazena a quantidade de trocas de contexto realizadas; pidOne que armazena o pid do processo filho 1; e pidTwo que armazena o pid do processo filho 2. O sinal SIGCONT é utilizado para indicar que a CPU deve voltar a executar esse processo. O sinal SIGSTOP pausa a execução do processo na CPU.
+
+O processo filho 2 executa primeiro kill(getpid(), SIGSTOP) para que ele seja pausado logo após a sua criação, dado que o processo filho 1 deve ser o primeiro a ser executado na CPU.
+
+O processo pai utiliza as chamadas waitpid(pidOne, 0, 0) e waitpid(pidTwo, 0, 0) para aguardar o término da execução dos processos filhos. Os processos filhos executam loops eternos, logo eles só terminam de ser executados se receberem um sinal SIGKILL. A função changeContext envia o sinal SIGKILL para os dois processos filhos quando a variável change armazena 10, indicando que 10 trocas de contexto já ocorreram (assim, o processo pai continua a sua execução, uma vez os filhos terminados, e o programa termina de ser executado tendo feito exatamente 10 trocas de contexto).
+Esse funcionamento é um funcionamento de escalonamento onde os processos filhos 1 e 2 são escalonados pelo pai utilizando o sinal SIGALRM como temporizador entre ocorrência de trocas de contexto. A função changeContext chama alarm(TIME) para que um sinal SIGALRM seja enviado ao processo pai após decorridos TIME segundos, funcionando assim como um temporizador. Por isso, sempre que um sinal de SIGALRM é recebido, alarm(TIME) deve ser chamado para agendar uma nova troca de contexto. Inicialmente, o processo pai chama alarm(TIME) para agendar a primeira troca de contexto. Em seguida, o próprio tratador de SIGALRM (changeContext) agenda as próximas trocas executando alarm(TIME). TIME é uma macro definida em ex01.c.
+ 
+-----------------------------------------------------
+
+QUESTÃO 2) Faça um programa que leia 2 números inteiros e imprima o resultado das 4 operações
+básicas sobre estes 2 números.
+Verifique o que acontece se o 2º. número da entrada for 0 (zero).
+Capture o sinal de erro de floating point (SIGFPE) e repita a experiência anterior.
+Altere seu programa para ler e realizar as operações aritméticas com números reais.
+
+-----------------------------------------------------
+
+ex02.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<signal.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+void divisionByZeroHandler(int signal) {
+
+	printf("\nAttempt to divide by 0! Floating Point Error!\n");
+	printf("This arithmetic operation will be ignored!\n\n");
+
+	exit(1);
+}
+
+int main() {
+
+	int first = 0, second = 0, option = 0;
+	double firstR = 0.0, secondR = 0.0;
+
+	printf("\n\nType 1 to enable custom SIGFPE Handler.\n");
+	printf("Type anything different than 1 to use default handler for SIGFPE.\n\n");
+
+	printf("Choose: ");
+	scanf("%d", &option);
+	printf("\n");
+
+	if(option == 1) {
+		signal(SIGFPE, divisionByZeroHandler);
+	}
+
+	option = 0;
+
+	printf("\n\nType 1 for arithmetic operations between integers.\n");
+	printf("Type 2 for arithmetic operations between real number.\n\n");
+	
+	while(option != 1 && option != 2) {
+		printf("Choose: ");
+		scanf("%d", &option);
+		printf("\n");
+	}
+
+	if(option == 1) {
+		printf("Enter Number A: ");
+		scanf("%d", &first);
+		printf("Enter Number B: ");
+		scanf("%d", &second);
+
+		printf("\n%d + %d = \n", first, second);
+		printf("%d\n", first + second);
+		printf("\n%d - %d = \n", first, second);
+		printf("%d\n", first - second);
+		printf("\n%d * %d = \n", first, second);
+		printf("%d\n", first * second);
+		printf("\n%d / %d = \n", first, second);
+		printf("%d\n", first / second);
+
+	} else if(option == 2) {
+		printf("Enter Number A: ");
+		scanf("%lf", &firstR);
+		printf("Enter Number B: ");
+		scanf("%lf", &secondR);
+
+		printf("\n%lf + %lf = \n", firstR, secondR);
+		printf("%lf\n", firstR + secondR);
+		printf("\n%lf - %lf = \n", firstR, secondR);
+		printf("%lf\n", firstR - secondR);
+		printf("\n%lf * %lf = \n", firstR, secondR);
+		printf("%lf\n", firstR * secondR);
+		printf("\n%lf / %lf = \n", firstR, secondR);
+		printf("%lf\n", firstR / secondR);
+	}
+	
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex ex02.c
+$ ./ex
+
+-----------------------------------------------------
+
+RESULTADO
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 2
+
+Enter Number A: 3
+Enter Number B: 2
+
+3.000000 + 2.000000 = 
+5.000000
+
+3.000000 - 2.000000 = 
+1.000000
+
+3.000000 * 2.000000 = 
+6.000000
+
+3.000000 / 2.000000 = 
+1.500000
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 2
+
+Enter Number A: 5
+Enter Number B: 0
+
+5.000000 + 0.000000 = 
+5.000000
+
+5.000000 - 0.000000 = 
+5.000000
+
+5.000000 * 0.000000 = 
+0.000000
+
+5.000000 / 0.000000 = 
+inf
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 1
+
+Enter Number A: 4
+Enter Number B: 2
+
+4 + 2 = 
+6
+
+4 - 2 = 
+2
+
+4 * 2 = 
+8
+
+4 / 2 = 
+2
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 1
+
+Enter Number A: 6
+Enter Number B: 0
+
+6 + 0 = 
+6
+
+6 - 0 = 
+6
+
+6 * 0 = 
+0
+
+6 / 0 = 
+
+Attempt to divide by 0! Floating Point Error!
+This arithmetic operation will be ignored!
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 2
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 1
+
+Enter Number A: 6
+Enter Number B: 0
+
+6 + 0 = 
+6
+
+6 - 0 = 
+6
+
+6 * 0 = 
+0
+
+6 / 0 = 
+Floating point exception (core dumped)
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 2
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 2
+
+Enter Number A: 6.6
+Enter Number B: 0.0
+
+6.600000 + 0.000000 = 
+6.600000
+
+6.600000 - 0.000000 = 
+6.600000
+
+6.600000 * 0.000000 = 
+0.000000
+
+6.600000 / 0.000000 = 
+inf
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 2
+
+Enter Number A: 4
+Enter Number B: 0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
+4.000000 + 0.000000 = 
+4.000000
+
+4.000000 - 0.000000 = 
+4.000000
+
+4.000000 * 0.000000 = 
+0.000000
+
+4.000000 / 0.000000 = 
+inf
+
+$ ./ex
+
+
+Type 1 to enable custom SIGFPE Handler.
+Type anything different than 1 to use default handler for SIGFPE.
+
+Choose: 1
+
+
+
+Type 1 for arithmetic operations between integers.
+Type 2 for arithmetic operations between real number.
+
+Choose: 2
+
+Enter Number A: 9
+Enter Number B: 0
+
+9.000000 + 0.000000 = 
+9.000000
+
+9.000000 - 0.000000 = 
+9.000000
+
+9.000000 * 0.000000 = 
+0.000000
+
+9.000000 / 0.000000 = 
+inf
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função divisionByZeroHandler que é definida como tratador do sinal SIGFPE (sinal para erros Floating Point Errors que ocorrem quando uma operação aritmética inválida deve ser realizada). signal(SIGFPE, divisionByZeroHandler) permite definir divisionByZeroHandler como o tratador do sinal SIGFPE para o processo pai e os seus processos filhos. Sempre que uma operação aritmética inválida é realizada, essa função é executada decorrendo da geração do sinal SIGFPE.
+O resultado mostra que isso ocorre para a divisão por zero em inteiros.
+Porém, a divisão por 0 em ponto flutuante (números reais) resultam em inf (infinito). Isso ocorre devido a precisão do 0.0 em ponto flutuante. Em ponto flutuante, o 0 não é 0 exato mas sim um valor inifnitamente pequeno. Qualquer número dividido por um valor infinitamente pequeno resulta em um número infinitamente grande (infinito inf).
+
+-----------------------------------------------------
+
+QUESTÃO 3) Faça um programa para monitorar e informar o preço de chamadas telefônicas. O programa
+deverá ser executado em background.
+O início e o término de uma chamada são informados através dos sinais SIGUSR1 e SIGUSR2,
+respectivamente.
+O custo da ligação é de 2 centavos por segundo, para ligações de até 1 minuto ou de 1
+centavo por segundo a partir do 2º. minuto, ou seja, uma ligação de 1m30s custa R$1,50.
+
+-----------------------------------------------------
+
+ex03.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<signal.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<time.h>
+
+int ongoingCall = 0;
+clock_t start, end;
+
+void startCall(int signal) {
+
+	if(ongoingCall == 0) {
+		start = clock();
+		ongoingCall = 1;
+	} else {
+		printf("\n\nBusy! There is already an ongoing call. Please wait for this call to end.\n\n");
+	}
+
+	return;
+}
+
+void finishCall(int signal) {
+	
+	if(ongoingCall == 1) {
+		end = clock();
+
+		double time = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+		int cents = 0;
+
+		if(time > 60) {
+			cents = (time - 60) + 120;
+		} else {
+			cents = time * 2;
+		}
+
+		int reais = cents / 100;
+		int centavos = cents % 100;
+
+		printf("\n\nCall ended! Time: %lf seconds", time);
+		printf("\nPrice of the Call: R$%d,%d\n\n", reais, centavos);
+		ongoingCall = 0;
+	} else {
+
+		printf("\n\nPlease, make a call first! There is no ongoing call at the moment.\n\n");
+	}
+
+	return;
+}
+
+int main() {
+
+	signal(SIGUSR1, startCall);	
+	signal(SIGUSR2, finishCall);
+
+	pid_t pid = 0;
+
+	start = 0;
+	end = 0;
+
+	pid = fork();
+
+	if(pid < 0) {
+
+		printf("\n\nfork() call error!\n\n");
+
+		exit(1);
+
+	} else if(pid > 0) {
+
+	} else {
+
+		while(1) {
+			
+		}
+
+	}
+	
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex ex03.c
+$ ./ex
+$ ps
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR2 5030
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR2 5030
+$ kill -s SIGUSR2 5030
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR2 5030
+$ ps
+$ kill -s SIGKILL 5030
+$ ps
+
+-----------------------------------------------------
+
+RESULTADO
+
+$ gcc -o ex ex03.c
+$ ./ex
+$ ps
+
+  PID TTY          TIME CMD
+ 4542 pts/4    00:00:00 bash
+ 5030 pts/4    00:00:02 ex
+ 5031 pts/4    00:00:00 ps
+
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR2 5030
+
+
+Call ended! Time: 26.001681 seconds
+Price of the Call: R$0,52
+
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR1 5030
+
+
+Busy! There is already an ongoing call. Please wait for this call to end.
+
+$ kill -s SIGUSR2 5030
+
+
+Call ended! Time: 122.671247 seconds
+Price of the Call: R$1,82
+
+$ kill -s SIGUSR2 5030
+
+
+Please, make a call first! There is no ongoing call at the moment.
+
+$ kill -s SIGUSR1 5030
+$ kill -s SIGUSR2 5030
+
+
+Call ended! Time: 128.866849 seconds
+Price of the Call: R$1,88
+
+$ ps
+
+  PID TTY          TIME CMD
+ 4542 pts/4    00:00:00 bash
+ 5030 pts/4    00:07:46 ex
+ 5320 pts/4    00:00:00 ps
+
+$ kill -s SIGKILL 5030
+$ ps
+
+  PID TTY          TIME CMD
+ 4542 pts/4    00:00:00 bash
+ 5326 pts/4    00:00:00 ps
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido possui uma função startCall responsável por inicializar um temporizador de chamada em background utilizando clock() do time.h. Caso uma chamada telefônica já esteja em andamento, então a função não inicia uma nova chamada telefônica e imprime a mensagem de que a linha telefônica está ocupada no momento. Quando clock() é executada, o valor de retorno (tempo em clocks no momento da chamada a clock()) é armazenado em uma variável global start (clock_t) e o valor 1 é atribuído à flag ongoingCall utilizada para controlar se há ou não uma chamada telefônica em andamento.
+
+A função finishCall identifica se há uma chamada em andamento (ongoingCall == 1). Caso não haja uma chamada em andamento, a função imprime a mensagem de que não há uma chamada telefônica em andamento para ser encerrada. Caso haja uma chamada telefônica em andamento (ongoingCall == 1), então clock() é executada para obter o tempo de término da chamada (o tempo em clocks exatamente agora, no momento em que clock() é executada) que é armazenada na variável global end(clock_t); a partir de start e end, é possível determinar o número de segundos que decorreram entre o início e o término da chamada telefônica ("(end - start) / CLOCKS_PER_SEC"). Se a chamada telefônica tiver durado mais de 60 segundos, então subtrai-se 60 segundos do número total de segundos e soma-se o resultado com 120 (2 * 60 devido a tarifa de 2 centavos por segundo no primeiro minuto) para obter o preço da chamada em centavos. Se a chamada durou menos de 61 segundos, então, o preço da chamada é de 2 vezeso número de segundos da chamada devido à tarifa de 2 centavos por segundo no primeiro minuto. Por fim, o preço em centavos pode ser convertido para reais e centavos fazendo as operações cents/100 (resulta nos reais) e cents%100 (resulta nos centavos).
+
+Portanto, a função startCall deve ser executada no início de uma chamada telefônica e a função finishCall deve ser executada no término da chamada em andamento. Dado que uma chamada telefônica é iniciada quando o processo pai ou filhos (que herdam tratadores de sinais do processo pai) recebem um sinal SIGUSR1, então a função startCall é definida como tratador do sinal SIGUSR1 do processo pai (e consequentemente dos processos filhos). signal(SIGUSR1, startCall) define startCall como tratador do sinal SIGUSR1. Sempre que o processo pai ou processos filhos receberem o sinal SIGUSR1, a função startCall é executada. signal(SIGUSR2, finishCall) define finishCall como tratador do sinal SIGUSR2. Sempre que o processo pai ou processos filhos receberem o sinal SIGUSR2, a função finishCall é executada.
+
+Para que o programa execute em background, o processo pai cria um processo filho que executa um loop eterno (nunca sendo terminado) e retorna. Assim, o processo pai termina e o processo filho permanece sendo executado em background tendo herdado os tratadores dos sinais SIGUSR1 e SIGUSR2 do processo pai. Novamente, fork() é utilizada para criar o processo filho.
+
+Na execução, o comando ps é utilizado para visualizar o pid do processo filho ainda em execução em background. Uma vez identificado o pid do processo, kill -s SIGUSR1 <PID DO PROCESSO> deve ser utilizada para enviar o sinal SIGUSR1 para o processo, indicando que uma chamada telefônica está sendo iniciada e que a função startCall deve ser executada. A função startCall é executada em background. Quandoa ligação telefônica terminar, kill -s SIGSTOP <PID DO PROCESSO> deve ser executada no terminal para enviar o sinal SIGUSR2 ao processo indicando que a chamada em andamento terminou e que finishCall deve ser executada para tratar esse sinal. A finishCall determina o preço da chamada e imprime na tela as informações da chamada telefônica (tempo decorrido em segundos e preço final).
+
+Apenas uma chamada pode ser efetuada por vez. Considerei que apenas uma linha de telefone é monitorada.
+
+-----------------------------------------------------
+
+QUESTÃO 4) Elabore três programas I/O bound que não terminem (loop de mensagens no vídeo).
+Elabore um programa que seja capaz de executar os 3 programas indicados anteriormente
+e que simule o compartilhamento da CPU entre os 3 processos com escalonamento RoundRobin
+com uma fatia de tempo de 1 segundo para o primeiro processo e de 2 segundos para
+os demais processos. Execute os programas e relate o que aconteceu.
+
+-----------------------------------------------------
+
+programOne.c
+
+#include<stdio.h>
+#include <unistd.h>
+
+int main() {
+
+	int a = 0;
+
+	while(1) {
+
+		printf("\n\nHello! I'm Program One!\n\n");
+		a = 100000000;
+		while(a > 0) {
+			printf("\nProgram One counting down!\t 43\n");
+			printf("\nProgram One counting down!\t 42\n");
+			printf("\nProgram One counting down!\t 41\n");
+			printf("\nProgram One counting down!\t 40\n");
+			printf("\nProgram One counting down!\t 39\n");
+			printf("\nProgram One counting down!\t 38\n");
+			printf("\nProgram One counting down!\t 37\n");
+			printf("\nProgram One counting down!\t 36\n");
+			printf("\nProgram One counting down!\t 35\n");
+			printf("\nProgram One counting down!\t 34\n");
+			printf("\nProgram One counting down!\t 33\n");
+			printf("\nProgram One counting down!\t 32\n");
+			printf("\nProgram One counting down!\t 31\n");
+			printf("\nProgram One counting down!\t 30\n");
+			printf("\nProgram One counting down!\t 29\n");
+			printf("\nProgram One counting down!\t 28\n");
+			printf("\nProgram One counting down!\t 27\n");
+			printf("\nProgram One counting down!\t 26\n");
+			printf("\nProgram One counting down!\t 25\n");
+			printf("\nProgram One counting down!\t 24\n");
+			printf("\nProgram One counting down!\t 23\n");
+			printf("\nProgram One counting down!\t 22\n");
+			printf("\nProgram One counting down!\t 21\n");
+			printf("\nProgram One counting down!\t 20\n");
+			printf("\nProgram One counting down!\t 19\n");
+			printf("\nProgram One counting down!\t 18\n");
+			printf("\nProgram One counting down!\t 17\n");
+			printf("\nProgram One counting down!\t 16\n");
+			printf("\nProgram One counting down!\t 15\n");
+			printf("\nProgram One counting down!\t 14\n");
+			printf("\nProgram One counting down!\t 13\n");
+			printf("\nProgram One counting down!\t 12\n");
+			printf("\nProgram One counting down!\t 11\n");
+			printf("\nProgram One counting down!\t 10\n");
+			printf("\nProgram One counting down!\t 9\n");
+			printf("\nProgram One counting down!\t 8\n");
+			printf("\nProgram One counting down!\t 7\n");
+			printf("\nProgram One counting down!\t 6\n");
+			printf("\nProgram One counting down!\t 5\n");
+			printf("\nProgram One counting down!\t 4\n");
+			printf("\nProgram One counting down!\t 3\n");
+			printf("\nProgram One counting down!\t 2\n");
+			printf("\nProgram One counting down!\t 1\n");
+			printf("\nProgram One counting down\t 0!\n");
+			sleep(1);			
+			a--;
+		}
+	}
+
+	return 0;
+}
+
+
+programTwo.c
+
+#include<stdio.h>
+#include <unistd.h>
+
+int main() {
+
+	int a = 0;
+
+   while(1) {
+
+      printf("\n\nHello! I'm Program Two!\n\n");
+      a = 100000000;
+		while(a > 0) {
+			printf("\nProgram Two counting down!\t 43\n");
+			printf("\nProgram Two counting down!\t 42\n");
+			printf("\nProgram Two counting down!\t 41\n");
+			printf("\nProgram Two counting down!\t 40\n");
+			printf("\nProgram Two counting down!\t 39\n");
+			printf("\nProgram Two counting down!\t 38\n");
+			printf("\nProgram Two counting down!\t 37\n");
+			printf("\nProgram Two counting down!\t 36\n");
+			printf("\nProgram Two counting down!\t 35\n");
+			printf("\nProgram Two counting down!\t 34\n");
+			printf("\nProgram Two counting down!\t 33\n");
+			printf("\nProgram Two counting down!\t 32\n");
+			printf("\nProgram Two counting down!\t 31\n");
+			printf("\nProgram Two counting down!\t 30\n");
+			printf("\nProgram Two counting down!\t 29\n");
+			printf("\nProgram Two counting down!\t 28\n");
+			printf("\nProgram Two counting down!\t 27\n");
+			printf("\nProgram Two counting down!\t 26\n");
+			printf("\nProgram Two counting down!\t 25\n");
+			printf("\nProgram Two counting down!\t 24\n");
+			printf("\nProgram Two counting down!\t 23\n");
+			printf("\nProgram Two counting down!\t 22\n");
+			printf("\nProgram Two counting down!\t 21\n");
+			printf("\nProgram Two counting down!\t 20\n");
+			printf("\nProgram Two counting down!\t 19\n");
+			printf("\nProgram Two counting down!\t 18\n");
+			printf("\nProgram Two counting down!\t 17\n");
+			printf("\nProgram Two counting down!\t 16\n");
+			printf("\nProgram Two counting down!\t 15\n");
+			printf("\nProgram Two counting down!\t 14\n");
+			printf("\nProgram Two counting down!\t 13\n");
+			printf("\nProgram Two counting down!\t 12\n");
+			printf("\nProgram Two counting down!\t 11\n");
+			printf("\nProgram Two counting down!\t 10\n");
+			printf("\nProgram Two counting down!\t 9\n");
+			printf("\nProgram Two counting down!\t 8\n");
+			printf("\nProgram Two counting down!\t 7\n");
+			printf("\nProgram Two counting down!\t 6\n");
+			printf("\nProgram Two counting down!\t 5\n");
+			printf("\nProgram Two counting down!\t 4\n");
+			printf("\nProgram Two counting down!\t 3\n");
+			printf("\nProgram Two counting down!\t 2\n");
+			printf("\nProgram Two counting down!\t 1\n");
+			printf("\nProgram Two counting down\t 0!\n");
+			sleep(1);			
+			a--;
+   	}
+	}
+
+   return 0;
+}
+
+programThree.c
+
+#include<stdio.h>
+#include <unistd.h>
+
+int main() {
+
+	int a = 0;
+
+   while(1) {
+
+      printf("\n\nHello! I'm Program Three!\n\n");
+		a = 100000000;
+		while(a > 0) { 
+			printf("\nProgram Three counting down!\t 43\n");
+			printf("\nProgram Three counting down!\t 42\n");
+			printf("\nProgram Three counting down!\t 41\n");
+			printf("\nProgram Three counting down!\t 40\n");
+			printf("\nProgram Three counting down!\t 39\n");
+			printf("\nProgram Three counting down!\t 38\n");
+			printf("\nProgram Three counting down!\t 37\n");
+			printf("\nProgram Three counting down!\t 36\n");
+			printf("\nProgram Three counting down!\t 35\n");
+			printf("\nProgram Three counting down!\t 34\n");
+			printf("\nProgram Three counting down!\t 33\n");
+			printf("\nProgram Three counting down!\t 32\n");
+			printf("\nProgram Three counting down!\t 31\n");
+			printf("\nProgram Three counting down!\t 30\n");
+			printf("\nProgram Three counting down!\t 29\n");
+			printf("\nProgram Three counting down!\t 28\n");
+			printf("\nProgram Three counting down!\t 27\n");
+			printf("\nProgram Three counting down!\t 26\n");
+			printf("\nProgram Three counting down!\t 25\n");
+			printf("\nProgram Three counting down!\t 24\n");
+			printf("\nProgram Three counting down!\t 23\n");
+			printf("\nProgram Three counting down!\t 22\n");
+			printf("\nProgram Three counting down!\t 21\n");
+			printf("\nProgram Three counting down!\t 20\n");
+			printf("\nProgram Three counting down!\t 19\n");
+			printf("\nProgram Three counting down!\t 18\n");
+			printf("\nProgram Three counting down!\t 17\n");
+			printf("\nProgram Three counting down!\t 16\n");
+			printf("\nProgram Three counting down!\t 15\n");
+			printf("\nProgram Three counting down!\t 14\n");
+			printf("\nProgram Three counting down!\t 13\n");
+			printf("\nProgram Three counting down!\t 12\n");
+			printf("\nProgram Three counting down!\t 11\n");
+			printf("\nProgram Three counting down!\t 10\n");
+			printf("\nProgram Three counting down!\t 9\n");
+			printf("\nProgram Three counting down!\t 8\n");
+			printf("\nProgram Three counting down!\t 7\n");
+			printf("\nProgram Three counting down!\t 6\n");
+			printf("\nProgram Three counting down!\t 5\n");
+			printf("\nProgram Three counting down!\t 4\n");
+			printf("\nProgram Three counting down!\t 3\n");
+			printf("\nProgram Three counting down!\t 2\n");
+			printf("\nProgram Three counting down!\t 1\n");
+			printf("\nProgram Three counting down!\t 0\n");
+			sleep(1);			
+			a--;
+		}
+
+   }
+
+   return 0;
+}
+
+ex04.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<signal.h>
+#include<unistd.h>
+#include<sys/wait.h>
+
+#define TIME_PROCESS_1 1
+#define TIME_PROCESS_2 2
+#define TIME_PROCESS_3 2
+
+// flags
+int turn = 1;
+
+// pid of the children (processes)
+pid_t pidOne = 0, pidTwo = 0, pidThree = 0;
+
+void scheduleProcess(int signal) {
+
+	if(turn == 1) {
+		kill(pidOne, SIGSTOP);
+		printf("\n\n=== Change from process %d (PID<%d>) to process %d (PID<%d>)\n\n", turn, pidOne, 2, pidTwo);
+		kill(pidTwo, SIGCONT);
+		turn = 2;
+		alarm(TIME_PROCESS_2);
+	} else if(turn == 2) {
+		kill(pidTwo, SIGSTOP);
+		printf("\n\n=== Change from process %d (PID<%d>) to process %d (PID<%d>)\n\n", turn, pidTwo, 3, pidThree);
+		kill(pidThree, SIGCONT);
+		turn = 3;
+		alarm(TIME_PROCESS_3);
+	} else if(turn == 3) {
+		kill(pidThree, SIGSTOP);
+      printf("\n\n=== Change from process %d (PID<%d>) to process %d (PID<%d>)\n\n", turn, pidThree, 1, pidOne);
+      kill(pidOne, SIGCONT);
+      turn = 1;
+		alarm(TIME_PROCESS_1);
+	} else {
+		turn = 1;
+		kill(pidTwo, SIGSTOP);
+		kill(pidThree, SIGSTOP);
+		kill(pidOne, SIGCONT);
+		alarm(TIME_PROCESS_1);
+	}
+
+}
+
+int main() {
+
+	signal(SIGALRM, scheduleProcess);	
+
+	pid_t pid = 0;
+
+	int a = 0;
+
+	char *parameters[] = {NULL};
+
+	pid = fork();
+
+	if(pid < 0) {
+
+		printf("\n\nfork() call error!\n\n");
+
+		exit(1);
+
+	} else if(pid > 0) {
+
+		pidOne = pid;
+
+		pid = fork();
+
+		if(pid < 0) {
+
+			printf("\n\nfork() call error!\n\n");
+
+			exit(1);
+
+		} else if(pid > 0) {
+
+			pidTwo = pid;
+
+			pid = fork();
+
+			if(pid < 0) {
+
+				printf("\n\nfork() call error!\n\n");
+				exit(1);
+
+			} else if(pid > 0) {
+
+				pidThree = pid;
+
+				alarm(TIME_PROCESS_1);
+
+				waitpid(pidOne, 0, 0);
+				waitpid(pidTwo, 0, 0);
+				waitpid(pidThree, 0, 0);
+
+			} else {
+
+				kill(getpid(), SIGSTOP);
+
+				execv("programThree", parameters);
+
+         	exit(0);
+
+			}
+
+		} else {
+
+			kill(getpid(), SIGSTOP);
+
+			execv("programTwo", parameters);
+			
+			exit(0);
+		}
+
+	} else {
+
+		execv("programOne", parameters);
+
+		exit(0);
+
+	}
+	
+	return 0;
+}
+
+-----------------------------------------------------
+
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o programOne programOne.c
+$ gcc -o programTwo programTwo.c
+$ gcc -o programThree programThree.c
+$ gcc -o ex ex04.c
+$ ./ex
+
+-----------------------------------------------------
+
+RESULTADO
+
+Hello! I'm Program One!
+
+
+Program One counting down!	 43
+
+Program One counting down!	 42
+
+Program One counting down!	 41
+
+Program One counting down!	 40
+
+Program One counting down!	 39
+
+Program One counting down!	 38
+
+Program One counting down!	 37
+
+Program One counting down!	 36
+
+Program One counting down!	 35
+
+Program One counting down!	 34
+
+Program One counting down!	 33
+
+Program One counting down!	 32
+
+Program One counting down!	 31
+
+Program One counting down!	 30
+
+Program One counting down!	 29
+
+Program One counting down!	 28
+
+Program One counting down!	 27
+
+Program One counting down!	 26
+
+Program One counting down!	 25
+
+Program One counting down!	 24
+
+Program One counting down!	 23
+
+Program One counting down!	 22
+
+Program One counting down!	 21
+
+Program One counting down!	 20
+
+Program One counting down!	 19
+
+Program One counting down!	 18
+
+Program One counting down!	 17
+
+Program One counting down!	 16
+
+Program One counting down!	 15
+
+Program One counting down!	 14
+
+Program One counting down!	 13
+
+Program One counting down!	 12
+
+Program One counting down!	 11
+
+Program One counting down!	 10
+
+Program One counting down!	 9
+
+Program One counting down!	 8
+
+Program One counting down!	 7
+
+Program One counting down!	 6
+
+Program One counting down!	 5
+
+Program One counting down!	 4
+
+Program One counting down!	 3
+
+Program One counting down!	 2
+
+Program One counting down!	 1
+
+Program One counting down	 0!
+
+
+=== Change from process 1 (PID<5852>) to process 2 (PID<5853>)
+
+
+
+Hello! I'm Program Two!
+
+
+Program Two counting down!	 43
+
+Program Two counting down!	 42
+
+Program Two counting down!	 41
+
+Program Two counting down!	 40
+
+Program Two counting down!	 39
+
+Program Two counting down!	 38
+
+Program Two counting down!	 37
+
+Program Two counting down!	 36
+
+Program Two counting down!	 35
+
+Program Two counting down!	 34
+
+Program Two counting down!	 33
+
+Program Two counting down!	 32
+
+Program Two counting down!	 31
+
+Program Two counting down!	 30
+
+Program Two counting down!	 29
+
+Program Two counting down!	 28
+
+Program Two counting down!	 27
+
+Program Two counting down!	 26
+
+Program Two counting down!	 25
+
+Program Two counting down!	 24
+
+Program Two counting down!	 23
+
+Program Two counting down!	 22
+
+Program Two counting down!	 21
+
+Program Two counting down!	 20
+
+Program Two counting down!	 19
+
+Program Two counting down!	 18
+
+Program Two counting down!	 17
+
+Program Two counting down!	 16
+
+Program Two counting down!	 15
+
+Program Two counting down!	 14
+
+Program Two counting down!	 13
+
+Program Two counting down!	 12
+
+Program Two counting down!	 11
+
+Program Two counting down!	 10
+
+Program Two counting down!	 9
+
+Program Two counting down!	 8
+
+Program Two counting down!	 7
+
+Program Two counting down!	 6
+
+Program Two counting down!	 5
+
+Program Two counting down!	 4
+
+Program Two counting down!	 3
+
+Program Two counting down!	 2
+
+Program Two counting down!	 1
+
+Program Two counting down	 0!
+
+Program Two counting down!	 43
+
+Program Two counting down!	 42
+
+Program Two counting down!	 41
+
+Program Two counting down!	 40
+
+Program Two counting down!	 39
+
+Program Two counting down!	 38
+
+Program Two counting down!	 37
+
+Program Two counting down!	 36
+
+Program Two counting down!	 35
+
+Program Two counting down!	 34
+
+Program Two counting down!	 33
+
+Program Two counting down!	 32
+
+Program Two counting down!	 31
+
+Program Two counting down!	 30
+
+Program Two counting down!	 29
+
+Program Two counting down!	 28
+
+Program Two counting down!	 27
+
+Program Two counting down!	 26
+
+Program Two counting down!	 25
+
+Program Two counting down!	 24
+
+Program Two counting down!	 23
+
+Program Two counting down!	 22
+
+Program Two counting down!	 21
+
+Program Two counting down!	 20
+
+Program Two counting down!	 19
+
+Program Two counting down!	 18
+
+Program Two counting down!	 17
+
+Program Two counting down!	 16
+
+Program Two counting down!	 15
+
+Program Two counting down!	 14
+
+Program Two counting down!	 13
+
+Program Two counting down!	 12
+
+Program Two counting down!	 11
+
+Program Two counting down!	 10
+
+Program Two counting down!	 9
+
+Program Two counting down!	 8
+
+Program Two counting down!	 7
+
+Program Two counting down!	 6
+
+Program Two counting down!	 5
+
+Program Two counting down!	 4
+
+Program Two counting down!	 3
+
+Program Two counting down!	 2
+
+Program Two counting down!	 1
+
+Program Two counting down	 0!
+
+
+=== Change from process 2 (PID<5853>) to process 3 (PID<5854>)
+
+
+
+Hello! I'm Program Three!
+
+
+Program Three counting down!	 43
+
+Program Three counting down!	 42
+
+Program Three counting down!	 41
+
+Program Three counting down!	 40
+
+Program Three counting down!	 39
+
+Program Three counting down!	 38
+
+Program Three counting down!	 37
+
+Program Three counting down!	 36
+
+Program Three counting down!	 35
+
+Program Three counting down!	 34
+
+Program Three counting down!	 33
+
+Program Three counting down!	 32
+
+Program Three counting down!	 31
+
+Program Three counting down!	 30
+
+Program Three counting down!	 29
+
+Program Three counting down!	 28
+
+Program Three counting down!	 27
+
+Program Three counting down!	 26
+
+Program Three counting down!	 25
+
+Program Three counting down!	 24
+
+Program Three counting down!	 23
+
+Program Three counting down!	 22
+
+Program Three counting down!	 21
+
+Program Three counting down!	 20
+
+Program Three counting down!	 19
+
+Program Three counting down!	 18
+
+Program Three counting down!	 17
+
+Program Three counting down!	 16
+
+Program Three counting down!	 15
+
+Program Three counting down!	 14
+
+Program Three counting down!	 13
+
+Program Three counting down!	 12
+
+Program Three counting down!	 11
+
+Program Three counting down!	 10
+
+Program Three counting down!	 9
+
+Program Three counting down!	 8
+
+Program Three counting down!	 7
+
+Program Three counting down!	 6
+
+Program Three counting down!	 5
+
+Program Three counting down!	 4
+
+Program Three counting down!	 3
+
+Program Three counting down!	 2
+
+Program Three counting down!	 1
+
+Program Three counting down!	 0
+
+Program Three counting down!	 43
+
+Program Three counting down!	 42
+
+Program Three counting down!	 41
+
+Program Three counting down!	 40
+
+Program Three counting down!	 39
+
+Program Three counting down!	 38
+
+Program Three counting down!	 37
+
+Program Three counting down!	 36
+
+Program Three counting down!	 35
+
+Program Three counting down!	 34
+
+Program Three counting down!	 33
+
+Program Three counting down!	 32
+
+Program Three counting down!	 31
+
+Program Three counting down!	 30
+
+Program Three counting down!	 29
+
+Program Three counting down!	 28
+
+Program Three counting down!	 27
+
+Program Three counting down!	 26
+
+Program Three counting down!	 25
+
+Program Three counting down!	 24
+
+Program Three counting down!	 23
+
+Program Three counting down!	 22
+
+Program Three counting down!	 21
+
+Program Three counting down!	 20
+
+Program Three counting down!	 19
+
+Program Three counting down!	 18
+
+Program Three counting down!	 17
+
+Program Three counting down!	 16
+
+Program Three counting down!	 15
+
+Program Three counting down!	 14
+
+Program Three counting down!	 13
+
+Program Three counting down!	 12
+
+Program Three counting down!	 11
+
+Program Three counting down!	 10
+
+Program Three counting down!	 9
+
+Program Three counting down!	 8
+
+Program Three counting down!	 7
+
+Program Three counting down!	 6
+
+Program Three counting down!	 5
+
+Program Three counting down!	 4
+
+Program Three counting down!	 3
+
+Program Three counting down!	 2
+
+Program Three counting down!	 1
+
+Program Three counting down!	 0
+
+
+=== Change from process 3 (PID<5854>) to process 1 (PID<5852>)
+
+
+Program One counting down!	 43
+
+Program One counting down!	 42
+
+Program One counting down!	 41
+
+Program One counting down!	 40
+
+Program One counting down!	 39
+
+Program One counting down!	 38
+
+Program One counting down!	 37
+
+Program One counting down!	 36
+
+Program One counting down!	 35
+
+Program One counting down!	 34
+
+Program One counting down!	 33
+
+Program One counting down!	 32
+
+Program One counting down!	 31
+
+Program One counting down!	 30
+
+Program One counting down!	 29
+
+Program One counting down!	 28
+
+Program One counting down!	 27
+
+Program One counting down!	 26
+
+Program One counting down!	 25
+
+Program One counting down!	 24
+
+Program One counting down!	 23
+
+Program One counting down!	 22
+
+Program One counting down!	 21
+
+Program One counting down!	 20
+
+Program One counting down!	 19
+
+Program One counting down!	 18
+
+Program One counting down!	 17
+
+Program One counting down!	 16
+
+Program One counting down!	 15
+
+Program One counting down!	 14
+
+Program One counting down!	 13
+
+Program One counting down!	 12
+
+Program One counting down!	 11
+
+Program One counting down!	 10
+
+Program One counting down!	 9
+
+Program One counting down!	 8
+
+Program One counting down!	 7
+
+Program One counting down!	 6
+
+Program One counting down!	 5
+
+Program One counting down!	 4
+
+Program One counting down!	 3
+
+Program One counting down!	 2
+
+Program One counting down!	 1
+
+Program One counting down	 0!
+
+
+=== Change from process 1 (PID<5852>) to process 2 (PID<5853>)
+
+
+Program Two counting down!	 43
+
+Program Two counting down!	 42
+
+Program Two counting down!	 41
+
+Program Two counting down!	 40
+
+Program Two counting down!	 39
+
+Program Two counting down!	 38
+
+Program Two counting down!	 37
+
+Program Two counting down!	 36
+
+Program Two counting down!	 35
+
+Program Two counting down!	 34
+
+Program Two counting down!	 33
+
+Program Two counting down!	 32
+
+Program Two counting down!	 31
+
+Program Two counting down!	 30
+
+Program Two counting down!	 29
+
+Program Two counting down!	 28
+
+Program Two counting down!	 27
+
+Program Two counting down!	 26
+
+Program Two counting down!	 25
+
+Program Two counting down!	 24
+
+Program Two counting down!	 23
+
+Program Two counting down!	 22
+
+Program Two counting down!	 21
+
+Program Two counting down!	 20
+
+Program Two counting down!	 19
+
+Program Two counting down!	 18
+
+Program Two counting down!	 17
+
+Program Two counting down!	 16
+
+Program Two counting down!	 15
+
+Program Two counting down!	 14
+
+Program Two counting down!	 13
+
+Program Two counting down!	 12
+
+Program Two counting down!	 11
+
+Program Two counting down!	 10
+
+Program Two counting down!	 9
+
+Program Two counting down!	 8
+
+Program Two counting down!	 7
+
+Program Two counting down!	 6
+
+Program Two counting down!	 5
+
+Program Two counting down!	 4
+
+Program Two counting down!	 3
+
+Program Two counting down!	 2
+
+Program Two counting down!	 1
+
+Program Two counting down	 0!
+
+Program Two counting down!	 43
+
+Program Two counting down!	 42
+
+Program Two counting down!	 41
+
+Program Two counting down!	 40
+
+Program Two counting down!	 39
+
+Program Two counting down!	 38
+
+Program Two counting down!	 37
+
+Program Two counting down!	 36
+
+Program Two counting down!	 35
+
+Program Two counting down!	 34
+
+Program Two counting down!	 33
+
+Program Two counting down!	 32
+
+Program Two counting down!	 31
+
+Program Two counting down!	 30
+
+Program Two counting down!	 29
+
+Program Two counting down!	 28
+
+Program Two counting down!	 27
+
+Program Two counting down!	 26
+
+Program Two counting down!	 25
+
+Program Two counting down!	 24
+
+Program Two counting down!	 23
+
+Program Two counting down!	 22
+
+Program Two counting down!	 21
+
+Program Two counting down!	 20
+
+Program Two counting down!	 19
+
+Program Two counting down!	 18
+
+Program Two counting down!	 17
+
+Program Two counting down!	 16
+
+Program Two counting down!	 15
+
+Program Two counting down!	 14
+
+Program Two counting down!	 13
+
+Program Two counting down!	 12
+
+Program Two counting down!	 11
+
+Program Two counting down!	 10
+
+Program Two counting down!	 9
+
+Program Two counting down!	 8
+
+Program Two counting down!	 7
+
+Program Two counting down!	 6
+
+Program Two counting down!	 5
+
+Program Two counting down!	 4
+
+Program Two counting down!	 3
+
+Program Two counting down!	 2
+
+Program Two counting down!	 1
+
+Program Two counting down	 0!
+
+
+=== Change from process 2 (PID<5853>) to process 3 (PID<5854>)
+
+
+Program Three counting down!	 43
+
+Program Three counting down!	 42
+
+Program Three counting down!	 41
+
+Program Three counting down!	 40
+
+Program Three counting down!	 39
+
+Program Three counting down!	 38
+
+Program Three counting down!	 37
+
+Program Three counting down!	 36
+
+Program Three counting down!	 35
+
+Program Three counting down!	 34
+
+Program Three counting down!	 33
+
+Program Three counting down!	 32
+
+Program Three counting down!	 31
+
+Program Three counting down!	 30
+
+Program Three counting down!	 29
+
+Program Three counting down!	 28
+
+Program Three counting down!	 27
+
+Program Three counting down!	 26
+
+Program Three counting down!	 25
+
+Program Three counting down!	 24
+
+Program Three counting down!	 23
+
+Program Three counting down!	 22
+
+Program Three counting down!	 21
+
+Program Three counting down!	 20
+
+Program Three counting down!	 19
+
+Program Three counting down!	 18
+
+Program Three counting down!	 17
+
+Program Three counting down!	 16
+
+Program Three counting down!	 15
+
+Program Three counting down!	 14
+
+Program Three counting down!	 13
+
+Program Three counting down!	 12
+
+Program Three counting down!	 11
+
+Program Three counting down!	 10
+
+Program Three counting down!	 9
+
+Program Three counting down!	 8
+
+Program Three counting down!	 7
+
+Program Three counting down!	 6
+
+Program Three counting down!	 5
+
+Program Three counting down!	 4
+
+Program Three counting down!	 3
+
+Program Three counting down!	 2
+
+Program Three counting down!	 1
+
+Program Three counting down!	 0
+
+Program Three counting down!	 43
+
+Program Three counting down!	 42
+
+Program Three counting down!	 41
+
+Program Three counting down!	 40
+
+Program Three counting down!	 39
+
+Program Three counting down!	 38
+
+Program Three counting down!	 37
+
+Program Three counting down!	 36
+
+Program Three counting down!	 35
+
+Program Three counting down!	 34
+
+Program Three counting down!	 33
+
+Program Three counting down!	 32
+
+Program Three counting down!	 31
+
+Program Three counting down!	 30
+
+Program Three counting down!	 29
+
+Program Three counting down!	 28
+
+Program Three counting down!	 27
+
+Program Three counting down!	 26
+
+Program Three counting down!	 25
+
+Program Three counting down!	 24
+
+Program Three counting down!	 23
+
+Program Three counting down!	 22
+
+Program Three counting down!	 21
+
+Program Three counting down!	 20
+
+Program Three counting down!	 19
+
+Program Three counting down!	 18
+
+Program Three counting down!	 17
+
+Program Three counting down!	 16
+
+Program Three counting down!	 15
+
+Program Three counting down!	 14
+
+Program Three counting down!	 13
+
+Program Three counting down!	 12
+
+Program Three counting down!	 11
+
+Program Three counting down!	 10
+
+Program Three counting down!	 9
+
+Program Three counting down!	 8
+
+Program Three counting down!	 7
+
+Program Three counting down!	 6
+
+Program Three counting down!	 5
+
+Program Three counting down!	 4
+
+Program Three counting down!	 3
+
+Program Three counting down!	 2
+
+Program Three counting down!	 1
+
+Program Three counting down!	 0
+
+
+=== Change from process 3 (PID<5854>) to process 1 (PID<5852>)
+
+
+Program One counting down!	 43
+
+Program One counting down!	 42
+
+Program One counting down!	 41
+
+Program One counting down!	 40
+
+Program One counting down!	 39
+
+Program One counting down!	 38
+
+Program One counting down!	 37
+
+Program One counting down!	 36
+
+Program One counting down!	 35
+
+Program One counting down!	 34
+
+Program One counting down!	 33
+
+Program One counting down!	 32
+
+Program One counting down!	 31
+
+Program One counting down!	 30
+
+Program One counting down!	 29
+
+Program One counting down!	 28
+
+Program One counting down!	 27
+
+Program One counting down!	 26
+
+Program One counting down!	 25
+
+Program One counting down!	 24
+
+Program One counting down!	 23
+
+Program One counting down!	 22
+
+Program One counting down!	 21
+
+Program One counting down!	 20
+
+Program One counting down!	 19
+
+Program One counting down!	 18
+
+Program One counting down!	 17
+
+Program One counting down!	 16
+
+Program One counting down!	 15
+
+Program One counting down!	 14
+
+Program One counting down!	 13
+
+Program One counting down!	 12
+
+Program One counting down!	 11
+
+Program One counting down!	 10
+
+Program One counting down!	 9
+
+Program One counting down!	 8
+
+Program One counting down!	 7
+
+Program One counting down!	 6
+
+Program One counting down!	 5
+
+Program One counting down!	 4
+
+Program One counting down!	 3
+
+Program One counting down!	 2
+
+Program One counting down!	 1
+
+Program One counting down	 0!
+
+-----------------------------------------------------
+
+CONCLUSÃO
+
+O código desenvolvido funciona exatamente da mesma forma que o código desenvolvido e explicado na questão 1 desse laboratório. No caso,a função changeContext mudou de assinatura e passou a se chamar scheduleProcess, uma vez que ela é executada para tratar o sinal SIGALRM para trocar o processo sendo executado pela CPU em dado momento. Nesse caso, diferentes tempos de execução na CPU foram pedidos para cada um de 3 processos filhos sendo escalonados por política round-robin. Esse escalonador seleciona os processos a serem executados pela CPU em uma dada fatia de tempo de forma cíclica, isto é, os processos são executados, cada um por uma fatia de tempo definida, na ordem processo 1, processo 2, processo 3, processo 1, processo 2, processo 3 e assim por diante até que todos os processos terminem de ser executados.
+
+Cada processo executa um programa entre os programas programOne, programTwo e programThree. As execv(programOne, parameters), execv(programTwo, parameters) e execv(programThree, parameters) são usadas para que os programas sejam executados dentro do contexto do processo onde execv é executada. Portanto, caso um processo seja pausado (SIGSTOP), o programa sendo executado (através de execv) no contexto desse processo também é pausado; e caso seja resumido (SIGCONT), o programa também é resumido.
+
+Cada programa imprime um conjunto enorme de mensagens (programas I/O Bound, isto é, que teriam melhor performance melhorando a capacidade de lidar com I/O) sem fim. A mensagem de cada programa começa identificando o programa que está imprimindo a mensagem. Podemos observar pelo resultado, vendo as mensagens impressas, que de fato os programas estão sendo executados em ordem cíclicas por períodos de tempo (fatias) de 1 segundo para o processo 1 e 2 segundos para os outros dois processos, assim como foi pedido no enunciado.
+
+Novamente signal(SIGALRM, scheduleProcess) é utilizado para definir a função scheduleProcess como tratador do sinal SIGNALRM recebido pelo processo pai e pelos processos filhos. Todo esse funcionamento de escalonamento foi explicado na conclusão do exercício 1 desse laboratório, inclusive as variáveis globais usadas são as mesmas turn, pidOne e pidTwo, havendo uma nova variável global pidThree para o terceiro processo. O processo pai aguarda o término da execução dos três processos filhos (waitpid). Dado que cada processo deve executar por um período (fatia) de tempo específico, macros TIME_PROCESS_1, TIME_PROCESS_2 e TIME_PROCESS_3 foram criadas, cada uma indicando a fatia de tempo em segundos dos respectivos processos e sendo usadas como parâmetro TIME de alarm(TIME) para agendar as futuras trocas de processo de acordo com a especificação do enunciado.
+
+-----------------------------------------------------
+
